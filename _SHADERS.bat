@@ -1,5 +1,4 @@
-:: Change the "1.3.211.0" to your Vulkan version.
-:: pass parameter debug, D, release, R 
+:: Pass parameter: _DEBUG or _RELEASE for compilation target.
 
 @echo off
 :: Output help info for user...
