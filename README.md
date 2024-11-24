@@ -1,2 +1,5 @@
 # Tiny-Engine
-Game/Render engine based on Vulkan (final rewrite of TinyVK).
+Game/Render engine based on Vulkan (final rewrite of [TinyVK](https://github.com/Yaazarai/TinyVK) from commit [8013101](https://github.com/Yaazarai/TinyVK/commit/80131018a9d4781a781ea413576e73e33cbf3c2c)). The goal of this project split (not branch) off from TinyVK and re-write the core of the renderer to be both more robust and to provide a proper interface for error handling. Error handling in TinyVK previously was handled via exceptions and would simply crash any-time an exception was reached. Instead now everything is handled properly with error-codes (VkResult errors) and initialization() functions. This errors can be captured instead of crashing and handled gracefully. The core design and functionality of the renderer is the same, however with major improvements to reduce overall implementation redundancy.
+
+### Why Tiny-Engine (Tiny Vulkan Engine)?
+Tiny-Engine is a great simple renderer (with 2D applications in mind) designed for rapid C++ graphics development, easily compatible with ImGUI for UI applications if needed or standalone for game development. This was not designed for large 3D Voxel rendering projects or the like complexity.
