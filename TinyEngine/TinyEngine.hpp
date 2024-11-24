@@ -1,6 +1,6 @@
 #pragma once
-#ifndef TNY_LIBRARY
-#define TNY_LIBRARY
+#ifndef TINY_ENGINE_LIBRARY
+#define TINY_ENGINE_LIBRARY
 
     ///   TINYVULKAN LIBRARY DEPENDENCIES: VULKAN, GLFW and VMA compiled library binaries.
     /// 
@@ -46,31 +46,31 @@
     #include <vulkan/vulkan.h>
     
     #ifdef _DEBUG
-        #define TNY_WINDOWMAIN main(int argc, char* argv[])
-        #define TNY_VALIDATION VK_TRUE
+        #define TINY_WINDOWMAIN main(int argc, char* argv[])
+        #define TINY_ENGINE_VALIDATION VK_TRUE
     #else
-        #define TNY_VALIDATION VK_FALSE
+        #define TINY_ENGINE_VALIDATION VK_FALSE
         #ifdef _WIN32
 			#ifndef __clang__
 			/// COMPILING WITH VISUAL STUDIO 2022
-            #define TNY_WINDOWMAIN __stdcall wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
+            #define TINY_ENGINE_WINDOWMAIN __stdcall wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 			#else
 			/// COMPILING WITH CLANG-CL / LLVM
-            #define TNY_WINDOWMAIN __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
+            #define TINY_ENGINE_WINDOWMAIN __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
             #endif
         #else
             /// For debugging w/ Console on Release change from /WINDOW to /CONSOLE: Linker -> System -> Subsystem.
-            #define TNY_WINDOWMAIN main(int argc, char* argv[])
+            #define TINY_ENGINE_WINDOWMAIN main(int argc, char* argv[])
         #endif
     #endif
     
-    #ifndef TNY_NAMESPACE
-        #define TNY_NAMESPACE tny
-        namespace TNY_NAMESPACE {}
+    #ifndef TINY_ENGINE_NAMESPACE
+        #define TINY_ENGINE_NAMESPACE tny
+        namespace TINY_ENGINE_NAMESPACE {}
     #endif
-    #define TNY_MAKE_VERSION(major, minor, patch) ((((uint32_t)major)<<16)|(((uint32_t)minor)<<8)|((uint32_t)patch))
-    #define TNY_VERSION VK_MAKE_API_VERSION(1, 0, 0)
-    #define TNY_NAME "TINY_ENGINE_LIBRARY"
+    #define TINY_ENGINE_MAKE_VERSION(major, minor, patch) VK_MAKE_API_VERSION(0, major, minor, patch)
+    #define TINY_ENGINE_VERSION TINY_ENGINE_MAKE_VERSION(1, 0, 0)
+    #define TINY_ENGINE_NAME "TINY_ENGINE_LIBRARY"
     
     ///
     /// Enables VMA automated GPU memory management.
@@ -78,7 +78,7 @@
     #define VMA_IMPLEMENTATION
     #define VMA_DEBUG_GLOBAL_MUTEX VK_TRUE
     #define VMA_USE_STL_CONTAINERS VK_TRUE
-    #define VMA_RECORDING_ENABLED TNY_VALIDATION
+    #define VMA_RECORDING_ENABLED TINY_ENGINE_VALIDATION
     #include <vma/vk_mem_alloc.h>
 
     ///
@@ -94,20 +94,69 @@
     ///
     /// General include libraries (data-structs, for-each search, etc.).
     ///
+    #include <memory>
+    #include <mutex>
     #include <fstream>
     #include <iostream>
+    #include <vector>
     #include <array>
     #include <set>
     #include <string>
-    #include <vector>
     #include <algorithm>
+    #include <functional>
+    #include <utility>
+    #include <type_traits>
 
     #pragma region BACKEND_SYSTEMS
+        #include "./TinyEnums.hpp"
+        #include "./TinyTimedGuard.hpp"
+        #include "./TinyInvokableCallback.hpp"
+        #include "./TinyDisposable.hpp"
+        #include "./TinyUtilities.hpp"
     #pragma endregion
     #pragma region WINDOW_INPUT_HANDLING
+        #include "./TinyWindow.hpp"
     #pragma endregion
     #pragma region VULKAN_INITIALIZATION
+        #include "./TinyVulkanDevice.hpp"
+        #include "./TinyCommandPool.hpp"
+        #include "./TinyGraphicsPipeline.hpp"
     #pragma endregion
-    #pragma region TNY_RENDERING
+    #pragma region TINY_RENDERING
+        #include "./TinyRenderContext.hpp"
+        #include "./TinyBuffer.hpp"
+        #include "./TinyImage.hpp"
+        #include "./TinyRenderer.hpp"
+        #include "./TinySwapchain.hpp"
+        #include "./TinyCompute.hpp"
+        #include "./TinyResourceQueue.hpp"
+        #include "./TinyMath.hpp"
     #pragma endregion
 #endif
+
+/// 
+/// API OUTLINE:
+///     Objects which dynamically allocate memory (such as VMA, pipelines, logical devices, etc.)
+///     all extent TinyDisposable and call their own dispose/destructor functions.
+/// 
+///     All objects which extend TinyDisposable expose a Constructor(...) and Initilize() function
+///     which can be called as a static constructor:
+///     
+///         TinyConstruct<TinyClass> unique_object = TinyClass::Construct(args...);
+///             std::unique_ptr<TinyClass>& object = unique_object.source;
+///             VkResult = object.result;
+///     
+///     This static constructor is for creating unique objects which also return ERROR codes
+///     rather than relying on exception handling.
+/// 
+///     Objects can also have their underlying dynamic memory manually disposed by calling:
+///         
+///         object.Disposable(waitIdle = true/false);
+///     
+///     Manually disposing dynamic memory keeps the object allive in the event that you need
+///     to re-create its resources with different settings / input arguments.
+///
+///     Manually instantiating objects via their constructors rather than using TinyConstruct<T>
+///     means you'll manually need to call .Initialize() to actually initialize the object and get
+///     it's VkResult for error handling.
+/// 
