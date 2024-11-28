@@ -308,6 +308,13 @@
 				return TinyConstruct<TinyGraphicsPipeline>(object, object->Initialize());
 			}	
 
+			/// @brief Gets the number of bound descriptors for a particular shader stage.
+			inline static uint32_t SelectBindingCountByShaderStage(TinyGraphicsPipeline& pipeline, VkShaderStageFlags flags) {
+				return std::count_if(pipeline.descriptorBindings.begin(), pipeline.descriptorBindings.end(), [flags](VkDescriptorSetLayoutBinding binding) {
+					return binding.stageFlags == flags;
+				});
+			}
+
 			/// @brief Gets a generic Normal Blending Mode for creating a GraphicsPipeline with.
 			inline static const VkPipelineColorBlendAttachmentState GetBlendDescription(bool isBlendingEnabled = true) {
 				VkPipelineColorBlendAttachmentState colorBlendAttachment{};
@@ -325,7 +332,7 @@
 			}
 
 			/// @brief Returns the push constant range info of a given size applied to the given shader stages.
-			inline static VkPushConstantRange SelectPushConstantRange(uint32_t pushConstantRangeSize = 0, VkShaderStageFlags shaderStages = VK_SHADER_STAGE_ALL_GRAPHICS) {
+			inline static VkPushConstantRange SelectPushConstantRange(uint32_t pushConstantRangeSize, VkShaderStageFlags shaderStages) {
 				VkPushConstantRange pushConstantRange{};
 				pushConstantRange.stageFlags = shaderStages;
 				pushConstantRange.offset = 0;
@@ -407,3 +414,11 @@
 		};
 	}
 #endif
+
+/*
+	PIPELINE PUSH DESCRIPTORS:
+		* Push Descriptors are bound to specific IDs for the graphics pipeline.
+			The bound IDs are shared across all shaders in the pipeline.
+			If the vertex shader binds a mat4 transform to binding ID = 0
+			Then the fragment shader must bind its texture to binding ID = 1
+*/

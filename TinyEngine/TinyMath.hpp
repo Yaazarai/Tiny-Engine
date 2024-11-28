@@ -63,8 +63,7 @@
             const static glm::vec2 GetUVCoords(glm::vec2 xy, glm::vec2 wh, bool forceClamp = true) {
                 if (forceClamp)
                     xy = glm::clamp(xy, glm::vec2(0.0, 0.0), wh);
-
-                return glm::vec2(xy.x * (1.0 / wh.x), xy.y * (1.0 / wh.y));
+                return xy * (glm::vec2(1.0, 1.0) / wh);
             }
 
             const static glm::vec2 GetXYCoords(glm::vec2 uv, glm::vec2 wh, bool forceClamp = true) {
@@ -114,49 +113,39 @@
         class TinyQuad {
         public:
             static const std::vector<glm::vec4> defvcolors;
+            
+            static std::vector<TinyVertex> CreateFromAtlas(glm::vec4 xywh, glm::float32 depth, glm::vec4 atlas_xywh, glm::vec2 atlas_wh, const std::vector<glm::vec4> vcolors = defvcolors) {
+                glm::vec2 uv1 = { atlas_xywh.x / atlas_wh.x, atlas_xywh.y / atlas_wh.y };
+                glm::vec2 uv2 = uv1 + glm::vec2(atlas_xywh.z / atlas_wh.x, atlas_xywh.w / atlas_wh.y);
+                glm::vec2 xy1 = glm::vec2(xywh.x, xywh.y);
+                glm::vec2 xy2 = glm::vec2(xywh.x, xywh.y) + glm::vec2(xywh.z, xywh.w);
 
-            static std::vector<TinyVertex> CreateExt(glm::vec3 whd, const std::vector<glm::vec4> vcolors = defvcolors) {
                 return {
-                    TinyVertex({0.0,0.0}, {0.0, 0.0, whd.z}, vcolors[0]),
-                    TinyVertex({1.0,0.0}, {whd.x, 0.0, whd.z}, vcolors[1]),
-                    TinyVertex({1.0,1.0}, {whd.x, whd.y, whd.z}, vcolors[2]),
-                    TinyVertex({0.0,1.0}, {0.0, whd.y, whd.z}, vcolors[3]),
+                    TinyVertex({uv1.x, uv1.y}, {xy1.x, xy1.y, depth}, vcolors[0]),
+                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vcolors[1]),
+                    TinyVertex({uv2.x, uv2.y}, {xy2.x, xy2.y, depth}, vcolors[2]),
+                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[3])
                 };
             }
 
-            static std::vector<TinyVertex> CreateWithOffsetExt(glm::vec2 xy, glm::vec3 whd, const std::vector<glm::vec4> vcolors = defvcolors) {
-                return {
-                    TinyVertex({0.0,0.0}, {xy.x, xy.y, whd.z}, vcolors[0]),
-                    TinyVertex({1.0,0.0}, {xy.x + whd.x, xy.y, whd.z}, vcolors[1]),
-                    TinyVertex({1.0,1.0}, {xy.x + whd.x, xy.y + whd.y, whd.z}, vcolors[2]),
-                    TinyVertex({0.0,1.0}, {xy.x, xy.y + whd.y, whd.z}, vcolors[3]),
-                };
+            static std::vector<TinyVertex> Create(glm::vec4 xywh, glm::float32 depth, const std::vector<glm::vec4> vcolors = defvcolors) {
+                return CreateFromAtlas(xywh, depth, glm::vec4(0.0, 0.0, 1.0, 1.0), glm::vec2(1.0, 1.0), vcolors);
+            }
+            
+            static std::vector<glm::vec4> CreateVertexColors(glm::vec4 TL, glm::vec4 TR, glm::vec4 BL, glm::vec4 BR) {
+                return {TL, TR, BR, BL};
+            }
+            
+            static glm::vec2 GetQuadAtlasXYWH(std::vector<TinyVertex>& quad) {
+                glm::vec2 wh = quad[2].texcoord - quad[0].texcoord;
+                return glm::vec4(quad[0].texcoord.x, quad[0].texcoord.y, wh.x, wh.y);
             }
 
-            static std::vector<TinyVertex> CreateFromAtlasExt(glm::vec2 xy, glm::vec3 whd, glm::vec2 atlaswh, const std::vector<glm::vec4> vcolors = defvcolors) {
-                glm::vec2 uv1 = { xy.x / whd.x, xy.y / whd.y };
-                glm::vec2 uv2 = uv1 + glm::vec2(whd.x / atlaswh.x, whd.y / atlaswh.y);
-
-                return {
-                    TinyVertex({uv1.x, uv1.y}, {xy.x, xy.y, whd.z}, vcolors[0]),
-                    TinyVertex({uv2.x, uv1.y}, {xy.x + whd.x, xy.y, whd.z}, vcolors[1]),
-                    TinyVertex({uv2.x, uv2.y}, {xy.x + whd.x, xy.y + whd.y, whd.z}, vcolors[2]),
-                    TinyVertex({uv1.x, uv2.y}, {xy.x, xy.y + whd.y, whd.z}, vcolors[3]),
-                };
+            static glm::vec4 GetQuadXYWH(std::vector<TinyVertex>& quad) {
+                glm::vec2 wh = quad[2].position - quad[0].position;
+                return glm::vec4(quad[0].position.x, quad[0].position.y, wh.x, wh.y);
             }
-
-            static std::vector<TinyVertex> Create(glm::vec3 whd, const glm::vec4 vcolor = defvcolors[0]) {
-                return CreateExt(whd, { vcolor,vcolor,vcolor,vcolor });
-            }
-
-            static std::vector<TinyVertex> CreateWithOffset(glm::vec2 xy, glm::vec3 whd, const glm::vec4 vcolor = defvcolors[0]) {
-                return CreateWithOffsetExt(xy, whd, { vcolor,vcolor,vcolor,vcolor });
-            }
-
-            static std::vector<TinyVertex> CreateFromAtlas(glm::vec2 xy, glm::vec3 whd, glm::vec2 atlaswh, const glm::vec4 vcolor = defvcolors[0]) {
-                return CreateFromAtlasExt(xy, whd, atlaswh, {vcolor,vcolor,vcolor,vcolor});
-            }
-
+            
             static void RotateScaleFromOrigin(std::vector<TinyVertex>& quad, glm::vec3 origin, glm::float32 radians, glm::float32 scale) {
                 glm::mat2 rotation = glm::mat2(glm::cos(radians), -glm::sin(radians), glm::sin(radians), glm::cos(radians));
                 glm::vec2 pivot = origin;
@@ -173,7 +162,7 @@
                 }
             }
 
-            static void OffsetPosition(std::vector<TinyVertex>& quad, glm::vec2 xy, bool relative) {
+            static void Reposition(std::vector<TinyVertex>& quad, glm::vec2 xy, bool relative) {
                 if (relative) {
                     quad[0].position += glm::vec3(xy,0.0f);
                     quad[1].position += glm::vec3(xy,0.0f);

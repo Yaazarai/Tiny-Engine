@@ -56,12 +56,14 @@
 		enum class TinyImageType {
 			/// @brief For writing or presenting with Swapchain (screen).
 			TYPE_SWAPCHAIN,
-			/// @brief For reading OR writing from/to VkImage via Fragment shaders.
+			/// @brief For writing to VkImage via Fragment shaders.
 			TYPE_COLORATTACHMENT,
 			/// @brief For reading/writing directly from/to VkImage via Compute shaders.
 			TYPE_STORAGE,
 			/// @brief For reading/writing depth/stencil shader information.
-			TYPE_DEPTHSTENCIL
+			TYPE_DEPTHSTENCIL,
+			/// @brief For reading within shaders only.
+			TYPE_SHADER_READONLY
 		};
 
 		/// @brief Window/Present Buffering Frequency.

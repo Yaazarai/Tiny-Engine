@@ -143,6 +143,11 @@
 						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 						aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 					break;
+					case TinyImageType::TYPE_SHADER_READONLY:
+						newLayout = TinyImageLayout::LAYOUT_SHADER_READONLY;
+						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+						aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+					break;
 				}
 
 				VmaAllocationCreateInfo allocCreateInfo {};
