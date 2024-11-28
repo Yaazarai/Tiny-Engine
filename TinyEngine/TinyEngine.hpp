@@ -53,14 +53,14 @@
         #ifdef _WIN32
 			#ifndef __clang__
 			/// COMPILING WITH VISUAL STUDIO 2022
-            #define TINY_ENGINE_WINDOWMAIN __stdcall wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
+            //#define TINY_WINDOWMAIN __stdcall wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
 			#else
 			/// COMPILING WITH CLANG-CL / LLVM
-            #define TINY_ENGINE_WINDOWMAIN __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
+            #define TINY_WINDOWMAIN __stdcall WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine, int nCmdShow)
             #endif
         #else
             /// For debugging w/ Console on Release change from /WINDOW to /CONSOLE: Linker -> System -> Subsystem.
-            #define TINY_ENGINE_WINDOWMAIN main(int argc, char* argv[])
+            #define TINY_WINDOWMAIN main(int argc, char* argv[])
         #endif
     #endif
     
@@ -106,6 +106,11 @@
     #include <functional>
     #include <utility>
     #include <type_traits>
+
+    /// 
+    /// Image Encoding / Decoding (using QOI: Quite Okay Image "Format").
+    /// 
+    #include "./Libraries/QuiteOkayImageFormat.h"
 
     #pragma region BACKEND_SYSTEMS
         #include "./TinyEnums.hpp"
