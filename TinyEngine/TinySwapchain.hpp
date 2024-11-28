@@ -45,9 +45,9 @@
 				if (waitIdle) renderContext.vkdevice.DeviceWaitIdle();
 
 				if (renderContext.graphicsPipeline.enableDepthTesting) {
-					for(size_t i = 0; i < static_cast<size_t>(bufferingMode); i++) {
-						imageDepthSources[i]->Dispose();
-						delete imageDepthSources[i];
+					for(TinyImage* depthImage : imageDepthSources) {
+						depthImage->Dispose();
+						delete depthImage;
 					}
 				}
 
@@ -55,16 +55,19 @@
 					cmdPool->Dispose();
 					delete cmdPool;
 				}
+				
+				for(VkSemaphore available : imageAvailable)
+					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, available, VK_NULL_HANDLE);
 
-				for (size_t i = 0; i < imageInFlight.size(); i++) {
-					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, imageAvailable[i], VK_NULL_HANDLE);
-					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, imageFinished[i], VK_NULL_HANDLE);
-					vkDestroyFence(renderContext.vkdevice.logicalDevice, imageInFlight[i], VK_NULL_HANDLE);
-				}
+				for(VkSemaphore finished : imageFinished)
+					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, finished, VK_NULL_HANDLE);
+				
+				for(VkFence inflight : imageInFlight)
+					vkDestroyFence(renderContext.vkdevice.logicalDevice, inflight, VK_NULL_HANDLE);
 
-				for(auto image : imageSources) {
-					vkDestroyImageView(renderContext.vkdevice.logicalDevice, image->imageView, VK_NULL_HANDLE);
-					delete image;
+				for(auto swapImage : imageSources) {
+					vkDestroyImageView(renderContext.vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
+					delete swapImage;
 				}
 
 				vkDestroySwapchainKHR(renderContext.vkdevice.logicalDevice, swapChain, VK_NULL_HANDLE);
@@ -337,6 +340,7 @@
 						vkDestroyImageView(renderContext.vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
 						delete swapImage;
 					}
+					imageSources.resize(0);
 
 					VkSwapchainKHR oldSwapChain = swapChain;
 					CreateSwapChain(width, height);
