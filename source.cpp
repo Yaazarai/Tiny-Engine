@@ -90,7 +90,7 @@ int TINY_WINDOWMAIN {
     // TESTING RENDERCONTEXT CHANGES WITH THE SWAPCHAIN RENDERER.
     int angle = 0;
     swapchain.ref().onRenderEvents.hook(TinyCallback<TinyCommandPool&>(
-        [&angle, &texture, &triangles1, &triangles2, &indices, &vkdevice, &window, &swapchain, &pipeline, &queue, &vbuffer, &ibuffer, &clearColor](TinyCommandPool& commandPool) {
+        [&angle, &texture, &triangles, &indices, &vkdevice, &window, &swapchain, &pipeline, &queue, &vbuffer, &ibuffer, &clearColor](TinyCommandPool& commandPool) {
         auto frame = queue.GetFrameResource();
 
         auto commandBuffer = commandPool.LeaseBuffer();
@@ -106,7 +106,7 @@ int TINY_WINDOWMAIN {
             double mousex, mousey;
             glfwGetCursorPos(window.ref().hwndWindow, &mousex, &mousey);
             int leftclick = glfwGetMouseButton(window.ref().hwndWindow, GLFW_MOUSE_BUTTON_1);
-            glm::vec4 sizes = TinyQuad::GetQuadXYWH(triangles1);
+            glm::vec4 sizes = TinyQuad::GetQuadXYWH(triangles);
             offsetx += (int(mousex) * leftclick);
             offsety += (int(mousey) * leftclick);
 
@@ -129,8 +129,8 @@ int TINY_WINDOWMAIN {
             //vkCmdBindIndexBuffer(commandBuffer.first, ibuffer.ref().buffer, 0, VK_INDEX_TYPE_UINT32);
             //vkCmdDrawIndexed(commandBuffer.first, 12, 2, 0, 0, 0);
 
-            swapchain.ref().CmdBindGeometryVI(commandBuffer.first, &vbuffer.ref().buffer, ibuffer.ref().buffer);
-            swapchain.ref().CmdDrawGeometry(commandBuffer.first, true, 2, 12);
+            swapchain.ref().CmdBindGeometry(commandBuffer.first, &vbuffer.ref().buffer, ibuffer.ref().buffer);
+            swapchain.ref().CmdDrawGeometry(commandBuffer.first, true, 2, indices.size());
         
         swapchain.ref().EndRecordCmdBuffer(commandBuffer.first);
         angle += 1;
