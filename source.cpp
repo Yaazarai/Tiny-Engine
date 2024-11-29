@@ -17,7 +17,7 @@ const std::vector<VkDescriptorSetLayoutBinding> pushDescriptorLayouts = {
     TinyGraphicsPipeline::SelectPushDescriptorLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
 };
 
-int TINY_WINDOWMAIN {
+int TINY_ENGINE_WINDOWMAIN {
     TinyConstruct<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 640, 480, true, false, true, 640, 480);
     TinyConstruct<TinyVkDevice> vkdevice = TinyVkDevice::Construct(true, false, true, window);
     TinyConstruct<TinyCommandPool> cmdpool = TinyCommandPool::Construct(vkdevice, false);
