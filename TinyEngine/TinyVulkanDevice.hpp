@@ -48,15 +48,15 @@
 			/// @brief Manually calls dispose on resources without deleting the object.
 			void Disposable(bool waitIdle) {
 				if (waitIdle) DeviceWaitIdle();
-
-				#if TINY_ENGINE_VALIDATION
-					DestroyDebugUtilsMessengerEXT(instance, debugMessenger, VK_NULL_HANDLE);
-				#endif
 				
 				vmaDestroyAllocator(memoryAllocator);
 				vkDestroyDevice(logicalDevice, VK_NULL_HANDLE);
 				if (presentSurface != VK_NULL_HANDLE)
 					vkDestroySurfaceKHR(instance, presentSurface, VK_NULL_HANDLE);
+				
+				#if TINY_ENGINE_VALIDATION
+					DestroyDebugUtilsMessengerEXT(instance, debugMessenger, VK_NULL_HANDLE);
+				#endif
 				vkDestroyInstance(instance, VK_NULL_HANDLE);
 			}
 
@@ -284,12 +284,12 @@
 				return result = CreateVMAllocator();
 			}
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyVkDevice> Construct(bool useGraphicsBit = true, bool useComputeBit = false, bool usePresentBit = false, TinyWindow* window = VK_NULL_HANDLE, const std::vector<VkPhysicalDeviceType> deviceTypes = { VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU }, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE }) {
+			inline static TinyObject<TinyVkDevice> Construct(bool useGraphicsBit = true, bool useComputeBit = false, bool usePresentBit = false, TinyWindow* window = VK_NULL_HANDLE, const std::vector<VkPhysicalDeviceType> deviceTypes = { VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU }, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE }) {
 				std::unique_ptr<TinyVkDevice> object =
 					std::make_unique<TinyVkDevice>(useGraphicsBit, useComputeBit, usePresentBit, window, deviceTypes, deviceFeatures);
-				return TinyConstruct<TinyVkDevice>(object, object->Initialize());
+				return TinyObject<TinyVkDevice>(object, object->Initialize());
 			}			
 		};
 	}

@@ -128,12 +128,12 @@
                 return result;
             }
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyCommandPool> Construct(TinyVkDevice& vkdevice, bool useAsComputeCommandPool, size_t bufferCount = defaultCommandPoolSize) {
+			inline static TinyObject<TinyCommandPool> Construct(TinyVkDevice& vkdevice, bool useAsComputeCommandPool, size_t bufferCount = defaultCommandPoolSize) {
 				std::unique_ptr<TinyCommandPool> object =
 					std::make_unique<TinyCommandPool>(vkdevice, useAsComputeCommandPool, bufferCount);
-				return TinyConstruct<TinyCommandPool>(object, object->Initialize());
+				return TinyObject<TinyCommandPool>(object, object->Initialize());
 			}
 		};
 	}

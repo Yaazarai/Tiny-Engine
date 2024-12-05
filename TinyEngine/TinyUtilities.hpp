@@ -7,14 +7,14 @@
 		#pragma region VULKAN_DEBUG_UTILITIES
 		
 		template <typename T>
-		class TinyConstruct {
+		class TinyObject {
 		public:
 			std::unique_ptr<T> source;
 			VkResult result;
 			
-			TinyConstruct(const TinyConstruct&) = delete;
-			TinyConstruct operator=(TinyConstruct&) = delete;
-			TinyConstruct(std::unique_ptr<T>& source, VkResult result) : source(std::move(source)), result(result) {}
+			TinyObject(const TinyObject&) = delete;
+			TinyObject operator=(TinyObject&) = delete;
+			TinyObject(std::unique_ptr<T>& source, VkResult result) : source(std::move(source)), result(result) {}
 
 			operator T&() { return static_cast<T&>(*source.get()); }
 			operator T*() { return static_cast<T*>(source.get()); }
@@ -53,6 +53,7 @@
 
 		VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
 			auto destroy = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+			destroy(instance, debugMessenger, pAllocator);
 			if (destroy != VK_NULL_HANDLE)
 				return VK_SUCCESS;
 			return VK_ERROR_INITIALIZATION_FAILED;

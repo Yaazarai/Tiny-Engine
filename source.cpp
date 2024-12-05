@@ -6,24 +6,24 @@ using namespace tny;
 //#define DEFAULT_FRAGMENT_SHADER "./Shaders/passthrough_frag.spv"
 #define SPRITE_VERTEX_SHADER "./Shaders/sprite_render_vert.spv"
 #define SPRITE_FRAGMENT_SHADER "./Shaders/sprite_render_frag.spv"
-const std::tuple<VkShaderStageFlagBits, std::string> vertexShader = { VK_SHADER_STAGE_VERTEX_BIT, SPRITE_VERTEX_SHADER };
-const std::tuple<VkShaderStageFlagBits, std::string> fragmentShader = { VK_SHADER_STAGE_FRAGMENT_BIT, SPRITE_FRAGMENT_SHADER };
-const std::vector<std::tuple<VkShaderStageFlagBits, std::string>> defaultShaders = { vertexShader, fragmentShader };
+const std::tuple<TinyShaderStages, std::string> vertexShader = { TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER };
+const std::tuple<TinyShaderStages, std::string> fragmentShader = { TinyShaderStages::STAGE_FRAGMENT, SPRITE_FRAGMENT_SHADER };
+const std::vector<std::tuple<TinyShaderStages, std::string>> defaultShaders = { vertexShader, fragmentShader };
 const TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription();
 
-const std::vector<VkPushConstantRange>& pushConstantRanges = { TinyGraphicsPipeline::SelectPushConstantRange(sizeof(glm::mat4), VK_SHADER_STAGE_VERTEX_BIT) };
+const std::vector<VkPushConstantRange>& pushConstantRanges = { TinyGraphicsPipeline::SelectPushConstantRange(sizeof(glm::mat4), TinyShaderStages::STAGE_VERTEX) };
 const std::vector<VkDescriptorSetLayoutBinding> pushDescriptorLayouts = {
-    TinyGraphicsPipeline::SelectPushDescriptorLayoutBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT, 1),
-    TinyGraphicsPipeline::SelectPushDescriptorLayoutBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, 1)
+    TinyGraphicsPipeline::SelectPushDescriptorLayoutBinding(0, TinyDescriptorType::TYPE_UNIFORM_BUFFER, TinyShaderStages::STAGE_VERTEX, 1),
+    TinyGraphicsPipeline::SelectPushDescriptorLayoutBinding(1, TinyDescriptorType::TYPE_IMAGE_SAMPLER, TinyShaderStages::STAGE_FRAGMENT, 1)
 };
 
 int TINY_ENGINE_WINDOWMAIN {
-    TinyConstruct<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 640, 480, true, false, true, 640, 480);
-    TinyConstruct<TinyVkDevice> vkdevice = TinyVkDevice::Construct(true, false, true, window);
-    TinyConstruct<TinyCommandPool> cmdpool = TinyCommandPool::Construct(vkdevice, false);
-    TinyConstruct<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, false);
-    TinyConstruct<TinyRenderContext> context = TinyRenderContext::Construct(vkdevice, cmdpool, pipeline);
-    TinyConstruct<TinySwapchain> swapchain = TinySwapchain::Construct(context, window, TinyBufferingMode::MODE_DOUBLE);
+    TinyObject<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 640, 480, true, false, true, 640, 480);
+    TinyObject<TinyVkDevice> vkdevice = TinyVkDevice::Construct(true, false, true, window);
+    TinyObject<TinyCommandPool> cmdpool = TinyCommandPool::Construct(vkdevice, false);
+    TinyObject<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, false);
+    TinyObject<TinyRenderContext> context = TinyRenderContext::Construct(vkdevice, cmdpool, pipeline);
+    TinyObject<TinySwapchain> swapchain = TinySwapchain::Construct(context, window, TinyBufferingMode::MODE_DOUBLE);
     
     qoi_desc texture_sheet;
     void* texture_data = qoi_read(DEFAULT_TEXTURE, &texture_sheet, 0);
@@ -33,7 +33,7 @@ int TINY_ENGINE_WINDOWMAIN {
     channels = texture_sheet.channels;
 
     // START IN COLOR_ATTACHEMENT LAYOUT FOR CPU-SIDE WRITE, THEN TRANSITION TO SHADER_READONLY FOR FRAGMENT SHADER.
-    TinyConstruct<TinyImage> texture = TinyImage::Construct(context.ref(), TinyImageType::TYPE_COLORATTACHMENT, width, height);
+    TinyObject<TinyImage> texture = TinyImage::Construct(context.ref(), TinyImageType::TYPE_COLORATTACHMENT, width, height);
     texture.ref().StageImageData(texture_data, width * height * channels);
     texture.ref().TransitionLayoutCmd(TinyImageLayout::LAYOUT_SHADER_READONLY);
 
@@ -52,8 +52,8 @@ int TINY_ENGINE_WINDOWMAIN {
     size_t sizeofTriangles = TinyMath::GetSizeofVector<TinyVertex>(triangles1) * 2;
     size_t sizeofIndices = TinyMath::GetSizeofVector<uint32_t>(indices1) * 2;
 
-    TinyConstruct<TinyBuffer> vbuffer = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_VERTEX, sizeofTriangles);
-    TinyConstruct<TinyBuffer> ibuffer = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_INDEX, sizeofIndices);
+    TinyObject<TinyBuffer> vbuffer = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_VERTEX, sizeofTriangles);
+    TinyObject<TinyBuffer> ibuffer = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_INDEX, sizeofIndices);
     
     std::vector<TinyVertex> triangles;
     std::vector<uint32_t> indices;
@@ -70,8 +70,8 @@ int TINY_ENGINE_WINDOWMAIN {
     vbuffer.ref().StageBufferData(triangles.data(), sizeofTriangles);
     ibuffer.ref().StageBufferData(indices.data(), sizeofIndices);
 
-    TinyConstruct<TinyBuffer> projection1 = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
-    TinyConstruct<TinyBuffer> projection2 = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
+    TinyObject<TinyBuffer> projection1 = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
+    TinyObject<TinyBuffer> projection2 = TinyBuffer::Construct(context.ref(), TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
 
     struct SwapFrame {
         TinyBuffer &projection;

@@ -6,6 +6,7 @@
 		/// @brief GPU device image for sending images to the render (GPU) device.
 		class TinyImage : public TinyDisposable {
 		public:
+			TinyRenderContext& renderContext;
 			std::timed_mutex image_lock;
 
 			VmaAllocation memory = VK_NULL_HANDLE;
@@ -22,8 +23,6 @@
 
 			VkDeviceSize width, height;
 			VkFormat format;
-
-			TinyRenderContext& renderContext;
 			const TinyImageType imageType;
 
 			/// @brief Deleted copy constructor (dynamic objects are not copyable).
@@ -56,49 +55,35 @@
 			}
 
 			VkResult CreateImageView() {
-				VkImageViewCreateInfo createInfo{};
-				createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-				createInfo.image = image;
-				createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-				createInfo.format = format;
-				createInfo.components = { VK_COMPONENT_SWIZZLE_IDENTITY };
-				createInfo.subresourceRange = { .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, .aspectMask = aspectFlags, };
+				VkImageViewCreateInfo createInfo {
+					.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+					.image = image, .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = format, .components = { VK_COMPONENT_SWIZZLE_IDENTITY },
+					.subresourceRange = { .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1, .aspectMask = aspectFlags, }
+				};
 
 				return vkCreateImageView(renderContext.vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &imageView);
 			}
 
 			VkResult CreateTextureSampler() {
-				VkSamplerCreateInfo samplerInfo {};
-				samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-				samplerInfo.magFilter = VK_FILTER_LINEAR;
-				samplerInfo.minFilter = VK_FILTER_LINEAR;
-				samplerInfo.addressModeU = addressingMode;
-				samplerInfo.addressModeV = addressingMode;
-				samplerInfo.addressModeW = addressingMode;
-				samplerInfo.anisotropyEnable = VK_FALSE;
 				VkPhysicalDeviceProperties properties {};
 				vkGetPhysicalDeviceProperties(renderContext.vkdevice.physicalDevice, &properties);
-				samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-				samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-				samplerInfo.unnormalizedCoordinates = VK_FALSE;
-				samplerInfo.compareEnable = VK_FALSE;
-				samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-				samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-				samplerInfo.mipLodBias = 0.0f;
-				samplerInfo.minLod = 0.0f;
-				samplerInfo.maxLod = 0.0f;
+
+				VkSamplerCreateInfo samplerInfo {
+					.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+					.magFilter = VK_FILTER_LINEAR, .minFilter = VK_FILTER_LINEAR,
+					.anisotropyEnable = VK_FALSE, .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+					.addressModeU = addressingMode, .addressModeV = addressingMode, .addressModeW = addressingMode, .unnormalizedCoordinates = VK_FALSE,
+					.compareEnable = VK_FALSE, .compareOp = VK_COMPARE_OP_ALWAYS,
+					.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR, .mipLodBias = 0.0f, .minLod = 0.0f, .maxLod = 0.0f,
+					.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+				};
 
 				return vkCreateSampler(renderContext.vkdevice.logicalDevice, &samplerInfo, VK_NULL_HANDLE, &imageSampler);
 			}
 
 			VkResult CreateImageSyncObjects() {
-				VkSemaphoreCreateInfo semaphoreInfo{};
-				semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-				semaphoreInfo.flags = VK_SEMAPHORE_TYPE_BINARY;
-
-				VkFenceCreateInfo fenceInfo{};
-				fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-				fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+				VkSemaphoreCreateInfo semaphoreInfo { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, .flags = VK_SEMAPHORE_TYPE_BINARY };
+				VkFenceCreateInfo fenceInfo { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT };
 
 				VkResult result = vkCreateSemaphore(renderContext.vkdevice.logicalDevice, &semaphoreInfo, VK_NULL_HANDLE, &imageAvailable);
 				if (result != VK_SUCCESS) return result;
@@ -224,9 +209,7 @@
 							dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;;
 						break;
 					}
-				}
-				
-				if (cmdBufferStage == TinyCmdBufferSubmitStage::STAGE_END) {
+				} else if (cmdBufferStage == TinyCmdBufferSubmitStage::STAGE_END) {
 					switch (layout) {
 						case TinyImageLayout::LAYOUT_COLOR_ATTACHMENT:
 							srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -278,9 +261,7 @@
 							dstAccessMask = VK_ACCESS_NONE;
 						break;
 					}
-				}
-
-				if (cmdBufferStage == TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END) {
+				} else if (cmdBufferStage == TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END) {
 					srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 					dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
 					srcAccessMask = VK_ACCESS_NONE;
@@ -361,39 +342,22 @@
 
 			/// @brief Copies data from CPU accessible memory to GPU accessible memory.
 			void StageImageData(void* data, VkDeviceSize dataSize) {
-				TinyConstruct<TinyBuffer> stagingBuffer = TinyBuffer::Construct(renderContext, TinyBufferType::TYPE_STAGING, dataSize);
+				TinyObject<TinyBuffer> stagingBuffer = TinyBuffer::Construct(renderContext, TinyBufferType::TYPE_STAGING, dataSize);
 				memcpy(stagingBuffer.ref().description.pMappedData, data, (size_t)dataSize);
 				TransitionLayoutCmd(TinyImageLayout::LAYOUT_TRANSFER_DST);
 				TransferFromBufferCmd(stagingBuffer);
 				TransitionLayoutCmd(TinyImageLayout::LAYOUT_COLOR_ATTACHMENT);
 			}
 
-			/// @brief Copies data from the source TinyBuffer into this TinyImage.
-			void TransferFromBufferCmd(TinyBuffer& srcBuffer) {
+			/// @brief Copies data from the source TinyBuffer into this TinyImage (size = 0,0 uses this image size by default).
+			void TransferFromBufferCmd(TinyBuffer& srcBuffer, VkExtent2D size = {0, 0}, VkOffset2D offset = {0, 0}) {
 				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = BeginTransferCmd();
 
 				TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END, imageLayout);
 				VkBufferImageCopy region = {
-					.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
+					.imageSubresource.aspectMask = aspectFlags, .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
 					.imageSubresource.mipLevel = 0, .imageSubresource.baseArrayLayer = 0, .imageSubresource.layerCount = 1,
-					.imageSubresource.aspectMask = aspectFlags,
-					.imageOffset = { 0, 0, 0 }, .imageExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 }
-				};
-				vkCmdCopyBufferToImage(bufferIndexPair.first, srcBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-				EndTransferCmd(bufferIndexPair);
-			}
-
-			/// @brief Copies data from the source TinyBuffer into this TinyImage.
-			void TransferFromBufferCmdExt(TinyBuffer& srcBuffer, VkExtent2D size, VkOffset2D offset) {
-				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = BeginTransferCmd();
-
-				TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END, imageLayout);
-				VkBufferImageCopy region = {
-					.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
-					.imageSubresource.mipLevel = 0, .imageSubresource.baseArrayLayer = 0, .imageSubresource.layerCount = 1,
-					.imageSubresource.aspectMask = aspectFlags,
-					.imageExtent = { static_cast<uint32_t>(size.width), static_cast<uint32_t>(size.height), 1 },
+					.imageExtent = { static_cast<uint32_t>((size.width == 0)?width:size.width), static_cast<uint32_t>((size.height == 0)?height:size.height), 1 },
 					.imageOffset = { static_cast<int32_t>(offset.x), static_cast<int32_t>(offset.y), 0 }
 				};
 				vkCmdCopyBufferToImage(bufferIndexPair.first, srcBuffer.buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
@@ -401,61 +365,30 @@
 				EndTransferCmd(bufferIndexPair);
 			}
 			
-			/// @brief Copies data from this TinyImage into the destination TinyBuffer
-			void TransferToBufferCmd(TinyBuffer& dstBuffer) {
+			/// @brief Copies data from this TinyImage into the destination TinyBuffer (size = 0,0 uses this image size by default).
+			void TransferToBufferCmd(TinyBuffer& dstBuffer, VkExtent2D size = {0, 0}, VkOffset2D offset = {0, 0}) {
 				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = BeginTransferCmd();
 
 				TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END, imageLayout);
 				VkBufferImageCopy region = {
-					.bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
+					.imageSubresource.aspectMask = aspectFlags, .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
 					.imageSubresource.mipLevel = 0, .imageSubresource.baseArrayLayer = 0, .imageSubresource.layerCount = 1,
-					.imageSubresource.aspectMask = aspectFlags,
-					.imageOffset = { 0, 0, 0 }, .imageExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 }
+					.imageExtent = { static_cast<uint32_t>((size.width == 0)?width:size.width), static_cast<uint32_t>((size.height == 0)?height:size.height), 1 },
+					.imageOffset = { static_cast<int32_t>(offset.x), static_cast<int32_t>(offset.y), 0 }
 				};
 				vkCmdCopyImageToBuffer(bufferIndexPair.first, image, (VkImageLayout) imageLayout, dstBuffer.buffer, 1, &region);
 
 				EndTransferCmd(bufferIndexPair);
 			}
 
-			/// @brief Copies data from this TinyImage into the destination TinyBuffer
-			void TransferToBufferCmdExt(TinyBuffer& dstBuffer, VkExtent2D size, VkOffset2D offset) {
-				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = BeginTransferCmd();
-
-				TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN_TO_END, imageLayout);
-				VkBufferImageCopy region{};
-				region.bufferOffset = 0;
-				region.bufferRowLength = 0;
-				region.bufferImageHeight = 0;
-				region.imageSubresource.aspectMask = aspectFlags;
-				region.imageSubresource.mipLevel = 0;
-				region.imageSubresource.baseArrayLayer = 0;
-				region.imageSubresource.layerCount = 1;
-				region.imageExtent = { static_cast<uint32_t>(size.width), static_cast<uint32_t>(size.height), 1 };
-				region.imageOffset = { static_cast<int32_t>(offset.x), static_cast<int32_t>(offset.y), 0 };
-				vkCmdCopyImageToBuffer(bufferIndexPair.first, image, (VkImageLayout) imageLayout, dstBuffer.buffer, 1, &region);
-
-				EndTransferCmd(bufferIndexPair);
-			}
-
-			/// @brief Copies data from this TinyImage into the destination TinyBuffer
-			inline static VkResult TransferImageCmd(TinyRenderContext& renderContext, TinyImage& srcImage, TinyImage& dstImage, VkDeviceSize dataSize) {
+			/// @brief Copies data from this TinyImage into the destination TinyBuffer (size = 0,0 uses this image size by default).
+			inline static VkResult TransferImageCmd(TinyRenderContext& renderContext, TinyImage& srcImage, TinyImage& dstImage, VkDeviceSize dataSize, VkExtent2D size = {0, 0}, VkOffset2D srcOffset = {0, 0}, VkOffset2D dstOffset = {0, 0}) {
 				if (srcImage.format != dstImage.format)
 					return VK_ERROR_FORMAT_NOT_SUPPORTED;
 				
 				TinyBuffer buffer(renderContext, TinyBufferType::TYPE_STAGING, dataSize);
-				srcImage.TransferToBufferCmd(buffer);
-				dstImage.TransferFromBufferCmd(buffer);
-                return VK_SUCCESS;
-			}
-
-			/// @brief Copies data from this TinyImage into the destination TinyBuffer
-			inline static VkResult TransferImageCmdExt(TinyRenderContext& renderContext, TinyImage& srcImage, TinyImage& dstImage, VkDeviceSize dataSize, VkExtent2D size, VkOffset2D srcOffset, VkOffset2D dstOffset) {
-				if (srcImage.format != dstImage.format)
-					return VK_ERROR_FORMAT_NOT_SUPPORTED;
-				
-				TinyBuffer buffer(renderContext, TinyBufferType::TYPE_STAGING, dataSize);
-				srcImage.TransferToBufferCmdExt(buffer, size, srcOffset);
-				dstImage.TransferFromBufferCmdExt(buffer, size, dstOffset);
+				srcImage.TransferToBufferCmd(buffer, size, srcOffset);
+				dstImage.TransferFromBufferCmd(buffer, size, dstOffset);
                 return VK_SUCCESS;
 			}
 			
@@ -469,34 +402,18 @@
 						return VK_ERROR_INITIALIZATION_FAILED;
 					imageLayout = TinyImageLayout::LAYOUT_UNDEFINED;
 					aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-                    return VK_SUCCESS;;
+                    return VK_SUCCESS;
 				} else {
 					return ReCreateImage(imageType, width, height, format, addressingMode);
 				}
             }
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyImage> Construct(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) {
+			inline static TinyObject<TinyImage> Construct(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) {
 				std::unique_ptr<TinyImage> object =
 					std::make_unique<TinyImage>(renderContext, type, width, height, imageSource, imageViewSource, imageSampler, imageAvailable, imageFinished, imageWaitable, format, addressingMode);
-				return TinyConstruct<TinyImage>(object, object->Initialize());
-			}
-			
-			/// @brief Returns a vec2 UV coordinate converted from this image Width/Height and passed vec2 XY coordinate.
-			glm::vec2 GetUVCoords(glm::vec2 xy, bool forceClamp = true) {
-				if (forceClamp)
-					xy = glm::clamp(xy, glm::vec2(0.0,0.0), glm::vec2(static_cast<float>(width), static_cast<float>(height)));
-				
-				return glm::vec2(xy.x * (1.0 / static_cast<float>(width)), xy.y * (1.0 / static_cast<float>(height)));
-			}
-
-			/// @brief Returns a vec2 XY coordinate converted from this image Width/Height and passed vec2 UV coordinate.
-			glm::vec2 GetXYCoords(glm::vec2 uv, bool forceClamp = true) {
-				if (forceClamp)
-					uv = glm::clamp(uv, glm::vec2(0.0, 0.0), glm::vec2(1.0, 1.0));
-					
-				return glm::vec2(uv.x * static_cast<float>(width), uv.y * static_cast<float>(height));
+				return TinyObject<TinyImage>(object, object->Initialize());
 			}
 		};
 	}

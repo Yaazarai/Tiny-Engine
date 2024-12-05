@@ -37,6 +37,15 @@ Example:
 The %INCLUDES% is a variable for the buildtool.bat commandline session which holds the includes directory.
 Then clang-cl includes the VulkanSDK headers, compiles Source.c and links to vulkan-1.lib
 
+If including non-compiled *.lib libraries which provide their uncompiled source (e.h. VMA, GLAD, IMGUI, etc.) you must also
+compile those library source *c./*.cpp files alongside your source.cpp or main.cpp file in the compiler command.
+
+Resolving Linker Errors:
+	Linker errors occur for two reason:
+		1. You didn't specify the library source *.c/*.cpp files in the compiler command to be compiled.
+		2. You didn't specify the library *.lib file in the linker.
+		3. You specified either 1 or 2, but the include paths are incorrect.
+
 Compiler Options:
 	/Oi			Enables intrinsic functions
 	/Gy			Enable function level linking

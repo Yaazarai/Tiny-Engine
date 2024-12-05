@@ -147,8 +147,8 @@
 ///     All objects which extend TinyDisposable expose a Constructor(...) and Initilize() function
 ///     which can be called as a static constructor:
 ///     
-///         TinyConstruct<TinyClass> unique_object = TinyClass::Construct(args...);
-///             std::unique_ptr<TinyClass>& object = unique_object.source;
+///         TinyObject<TinyObject> unique_object = TinyObject::Construct(args...);
+///             std::unique_ptr<TinyObject>& object = unique_object.source;
 ///             VkResult = object.result;
 ///     
 ///     This static constructor is for creating unique objects which also return ERROR codes
@@ -161,7 +161,10 @@
 ///     Manually disposing dynamic memory keeps the object allive in the event that you need
 ///     to re-create its resources with different settings / input arguments.
 ///
-///     Manually instantiating objects via their constructors rather than using TinyConstruct<T>
+///     Manually instantiating objects via their constructors rather than using TinyObject<T>
 ///     means you'll manually need to call .Initialize() to actually initialize the object and get
 ///     it's VkResult for error handling.
+///
+///     Calling the TinyObject::Construction() will call the class' .Initialize() function as well
+///     The .Initialize() function calls ALL .Create*() functions of each class.
 /// 

@@ -49,37 +49,6 @@
 				vkGetDeviceQueue(vkdevice.logicalDevice, indices.computeFamily, 0, &computeQueue);
             }
 
-            /// @brief Create a shader module of an imported SPIR-V shader file.
-			VkShaderModule CreateShaderModule(std::vector<char> shaderCode) {
-				VkShaderModuleCreateInfo createInfo{};
-				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-				createInfo.pNext = VK_NULL_HANDLE;
-				createInfo.flags = 0;
-				createInfo.codeSize = shaderCode.size();
-				createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
-
-				VkShaderModule shaderModule;
-				if (vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule) != VK_SUCCESS)
-					return VK_NULL_HANDLE;
-
-				return shaderModule;
-			}
-
-			/// @brief Build Shader VkPipelineShaderStageCreateInfo from shader modules &stages.
-			VkPipelineShaderStageCreateInfo CreateShaderInfo(const std::string& path, VkShaderModule shaderModule, VkShaderStageFlagBits stageFlagBits) {
-				VkPipelineShaderStageCreateInfo shaderStageInfo{};
-				shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-				shaderStageInfo.stage = stageFlagBits;
-				shaderStageInfo.module = shaderModule;
-				shaderStageInfo.pName = "main";
-
-				#if TVK_VALIDATION_LAYERS
-				std::cout << "TinyVulkan: Loading Shader @ " << path << std::endl;
-				#endif
-
-				return shaderStageInfo;
-			}
-
 			/// @brief Read out a SPIR-V shader file.
 			std::vector<char> ReadShaderFile(const std::string& path) {
 				std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -94,13 +63,26 @@
 				return {};
 			}
 			
+			/// @brief Create a shader module of an imported SPIR-V shader file.
+			VkShaderModule CreateShaderModule(std::vector<char> shaderCode) {
+				VkShaderModuleCreateInfo createInfo {
+					.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+					.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data()), .codeSize = shaderCode.size(), .flags = 0, .pNext = VK_NULL_HANDLE,
+				};
+
+				VkShaderModule shaderModule;
+				if (vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule) != VK_SUCCESS)
+					return VK_NULL_HANDLE;
+
+				return shaderModule;
+			}
+			
             /// @brief Create compute pipeline load shader(s).
 			VkResult CreateComputePipeline() {
 				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
 				if (!indices.hasComputeFamily)
 					return VK_ERROR_INITIALIZATION_FAILED;
 				
-				VkPipelineShaderStageCreateInfo shaderPipelineCreateInfo;
 				VkShaderModule shaderModule;
 				auto shaderCode = ReadShaderFile(shader);
 				shaderModule = CreateShaderModule(shaderCode);
@@ -108,7 +90,12 @@
                 if (shaderModule == VK_NULL_HANDLE)
                     return VK_ERROR_INITIALIZATION_FAILED;
                 
-				shaderPipelineCreateInfo = CreateShaderInfo(shader, shaderModule, VK_SHADER_STAGE_COMPUTE_BIT);
+				#if TINY_ENGINE_VALIDATION
+				std::cout << "TinyVulkan: Loading Shader @ " << shader << std::endl;
+				#endif
+				VkPipelineShaderStageCreateInfo shaderPipelineCreateInfo = {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_COMPUTE_BIT, .module = shaderModule, .pName = "main"
+				};
 
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +192,7 @@
 			}
 
 			/// @brief Records Push Constants to the command buffer.
-			void PushConstants(VkCommandBuffer cmdBuffer, VkShaderStageFlagBits shaderFlags, uint32_t byteSize, const void* pValues) {
+			void PushConstants(VkCommandBuffer cmdBuffer, uint32_t byteSize, const void* pValues) {
 				vkCmdPushConstants(cmdBuffer, computePipelineLayout, VK_PIPELINE_BIND_POINT_COMPUTE, 0, byteSize, pValues);
 			}
 
@@ -260,12 +247,12 @@
                 return CreateComputePipeline();
             }
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyCompute> Construct(TinyVkDevice& vkdevice, TinyCommandPool& commandPool, const std::string shader, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges) {
+			inline static TinyObject<TinyCompute> Construct(TinyVkDevice& vkdevice, TinyCommandPool& commandPool, const std::string shader, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges) {
 				std::unique_ptr<TinyCompute> object =
 					std::make_unique<TinyCompute>(vkdevice, commandPool, shader, descriptorBindings, pushConstantRanges);
-				return TinyConstruct<TinyCompute>(object, object->Initialize());
+				return TinyObject<TinyCompute>(object, object->Initialize());
 			}
         };
     }

@@ -403,12 +403,12 @@
 				return CreateImageSyncObjects();
             }
 			
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinySwapchain> Construct(TinyRenderContext& renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+			inline static TinyObject<TinySwapchain> Construct(TinyRenderContext& renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
 				std::unique_ptr<TinySwapchain> object =
 					std::make_unique<TinySwapchain>(renderContext, window, bufferingMode, cmdpoolbuffercount, presentDetails, imageUsage);
-				return TinyConstruct<TinySwapchain>(object, object->Initialize());
+				return TinyObject<TinySwapchain>(object, object->Initialize());
 			}
 		};
 	}

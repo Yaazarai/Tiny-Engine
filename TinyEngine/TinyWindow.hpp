@@ -121,12 +121,12 @@
                 return VK_ERROR_INITIALIZATION_FAILED;
             }
 			
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyWindow> Construct(std::string title, int width, int height, bool resizable, bool transparent  = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200) {
+			inline static TinyObject<TinyWindow> Construct(std::string title, int width, int height, bool resizable, bool transparent  = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200) {
 				std::unique_ptr<TinyWindow> object =
 					std::make_unique<TinyWindow>(title, width, height, resizable, transparent, hasMinSize, minWidth, minHeight);
-				return TinyConstruct<TinyWindow>(object, object->Initialize());
+				return TinyObject<TinyWindow>(object, object->Initialize());
 			}
         };
     }

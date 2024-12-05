@@ -4,6 +4,16 @@
 	#include "./TinyEngine.hpp"
 
 	namespace TINY_ENGINE_NAMESPACE {
+		/// Valid implemented shader stages in Tiny-Engine.
+		enum TinyShaderStages {
+			/// @brief Vertex (Point) stage pre-rasterization.
+			STAGE_VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
+			/// @brief Fragment (Pixel) stage post-rasterization.
+			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
+			/// @brief Compute (Dispatch) stage non-rendering.
+			STAGE_COMPUTE = VK_SHADER_STAGE_COMPUTE_BIT
+		};
+		
 		/// Specifies tghe object type we're sending to our shader: image, buffer, etc.
 		enum TinyDescriptorType {
 			/// @brief Read-Only image type for shader samplers.
@@ -29,7 +39,7 @@
 			/// @brief For tranfering CPU bound buffer data to the GPU.
 			TYPE_STAGING,
 			/// @brief For writing data from fragment/compute shaders.
-			TYPE_STORAGE,
+			TYPE_STORAGE
 		};
 
 		/// @brief Image-Layout for rendering operations.

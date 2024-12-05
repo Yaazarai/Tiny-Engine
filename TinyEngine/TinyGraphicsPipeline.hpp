@@ -4,8 +4,8 @@
 	#include "./TinyEngine.hpp"
 
 	namespace TINY_ENGINE_NAMESPACE {
-		#define VKCOMP_RGBA VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
-		#define VKCOMP_BGRA VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT
+		#define VKCOMP_RGBA_BITS VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+		#define VKCOMP_BGRA_BITS VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT
 
 		/// @brief Represents the Vertex shader layout data passing through the graphics pipeline.
 		struct TinyVertexDescription {
@@ -20,10 +20,10 @@
 		public:
 			TinyVkDevice& vkdevice;
 			
-			const std::vector<std::tuple<VkShaderStageFlagBits, std::string>> shaders;
-			VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
+			const std::vector<std::tuple<TinyShaderStages, std::string>> shaders;
 			std::vector<VkDescriptorSetLayoutBinding> descriptorBindings;
 			std::vector<VkPushConstantRange> pushConstantRanges;
+			VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
 
 			VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 			VkPipeline graphicsPipeline = VK_NULL_HANDLE;
@@ -32,11 +32,11 @@
 			
 			VkFormat imageFormat;
 			VkPipelineColorBlendAttachmentState colorBlendState;
-			VkColorComponentFlags colorComponentFlags = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			VkColorComponentFlags colorComponentFlags;
 			
 			TinyVertexDescription vertexDescription;
-			VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-			VkPolygonMode polgyonTopology = VK_POLYGON_MODE_FILL;
+			VkPrimitiveTopology vertexTopology;
+			VkPolygonMode polgyonTopology;
 			
 			bool enableBlending;
 			bool enableDepthTesting;
@@ -60,7 +60,7 @@
 			}
 
 			/// @brief Creates a Managed VkPipeline which defines our raster graphics stages: Must call Initialize() manually.
-			TinyGraphicsPipeline(TinyVkDevice& vkdevice, TinyVertexDescription vertexDescription, const std::vector<std::tuple<VkShaderStageFlagBits, std::string>> shaders, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges, bool enableDepthTesting = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkColorComponentFlags colorComponentFlags = VKCOMP_RGBA, VkPipelineColorBlendAttachmentState colorBlendState = GetBlendDescription(true), VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polgyonTopology = VK_POLYGON_MODE_FILL)
+			TinyGraphicsPipeline(TinyVkDevice& vkdevice, TinyVertexDescription vertexDescription, const std::vector<std::tuple<TinyShaderStages, std::string>> shaders, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges, bool enableDepthTesting = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkColorComponentFlags colorComponentFlags = VKCOMP_RGBA_BITS, VkPipelineColorBlendAttachmentState colorBlendState = GetBlendDescription(true), VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polgyonTopology = VK_POLYGON_MODE_FILL)
 			: vkdevice(vkdevice), imageFormat(imageFormat), vertexDescription(vertexDescription), shaders(shaders), descriptorBindings(descriptorBindings), pushConstantRanges(pushConstantRanges), colorComponentFlags(colorComponentFlags), colorBlendState(colorBlendState), vertexTopology(vertexTopology), polgyonTopology(polgyonTopology) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 
@@ -92,37 +92,6 @@
 				return VK_FORMAT_D32_SFLOAT;
 			}
 			
-			/// @brief Create a shader module of an imported SPIR-V shader file.
-			VkShaderModule CreateShaderModule(std::vector<char> shaderCode) {
-				VkShaderModuleCreateInfo createInfo{};
-				createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-				createInfo.pNext = VK_NULL_HANDLE;
-				createInfo.flags = 0;
-				createInfo.codeSize = shaderCode.size();
-				createInfo.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data());
-
-				VkShaderModule shaderModule;
-				if (vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule) != VK_SUCCESS)
-					return VK_NULL_HANDLE;
-
-				return shaderModule;
-			}
-
-			/// @brief Build Shader VkPipelineShaderStageCreateInfo from shader modules &stages.
-			VkPipelineShaderStageCreateInfo CreateShaderInfo(const std::string& path, VkShaderModule shaderModule, VkShaderStageFlagBits stageFlagBits) {
-				VkPipelineShaderStageCreateInfo shaderStageInfo{};
-				shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-				shaderStageInfo.stage = stageFlagBits;
-				shaderStageInfo.module = shaderModule;
-				shaderStageInfo.pName = "main";
-
-				#if TVK_VALIDATION_LAYERS
-				std::cout << "TinyVulkan: Loading Shader @ " << path << std::endl;
-				#endif
-
-				return shaderStageInfo;
-			}
-
 			/// @brief Read out a SPIR-V shader file.
 			std::vector<char> ReadShaderFile(const std::string& path) {
 				std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -135,6 +104,20 @@
 					return buffer;
 				}
 				return {};
+			}
+
+			/// @brief Create a shader module of an imported SPIR-V shader file.
+			VkShaderModule CreateShaderModule(std::vector<char> shaderCode) {
+				VkShaderModuleCreateInfo createInfo {
+					.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+					.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data()), .codeSize = shaderCode.size(), .flags = 0, .pNext = VK_NULL_HANDLE,
+				};
+
+				VkShaderModule shaderModule;
+				if (vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule) != VK_SUCCESS)
+					return VK_NULL_HANDLE;
+
+				return shaderModule;
 			}
 			
 			/// @brief Initialize the Graphics Pipeline and Read/Compile shaders.
@@ -149,31 +132,27 @@
 				const std::vector<VkVertexInputAttributeDescription>& attributeDescriptions = vertexDescription.attributes;
 				VkResult result = VK_SUCCESS;
 
-				VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-				vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-				vertexInputInfo.vertexBindingDescriptionCount = 1;
-				vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-				vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-				vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+				VkPipelineVertexInputStateCreateInfo vertexInputInfo {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+					.pVertexBindingDescriptions = &bindingDescription, .vertexBindingDescriptionCount = 1,
+					.pVertexAttributeDescriptions = attributeDescriptions.data(), .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size())
+				};
 				
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-				pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 				
-				pipelineLayoutInfo.pushConstantRangeCount = 0;
-				uint32_t pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
-				if (pushConstantRangeCount > 0) {
-					pipelineLayoutInfo.pushConstantRangeCount = pushConstantRangeCount;
-					pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
-				}
+				VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+					.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size()),
+					.pPushConstantRanges = pushConstantRanges.data()
+				};
 
 				if (descriptorBindings.size() > 0) {
-					VkDescriptorSetLayoutCreateInfo descriptorCreateInfo{};
-					descriptorCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-					descriptorCreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
-					descriptorCreateInfo.bindingCount = static_cast<uint32_t>(descriptorBindings.size());
-					descriptorCreateInfo.pBindings = descriptorBindings.data();
+					VkDescriptorSetLayoutCreateInfo descriptorCreateInfo {
+						.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+						.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
+						.pBindings = descriptorBindings.data(), .bindingCount = static_cast<uint32_t>(descriptorBindings.size())
+					};
 
 					result = vkCreateDescriptorSetLayout(vkdevice.logicalDevice, &descriptorCreateInfo, VK_NULL_HANDLE, &descriptorLayout);
 					if (result != VK_SUCCESS) return result;
@@ -187,69 +166,54 @@
 				
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-				inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-				inputAssembly.topology = vertexTopology;
-				inputAssembly.primitiveRestartEnable = VK_FALSE;
+				
+				VkPipelineInputAssemblyStateCreateInfo inputAssembly {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+					.topology = vertexTopology, .primitiveRestartEnable = VK_FALSE
+				};
 
-				VkPipelineViewportStateCreateInfo viewportState{};
-				viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-				viewportState.viewportCount = 1;
-				viewportState.scissorCount = 1;
-				viewportState.flags = 0;
+				VkPipelineViewportStateCreateInfo viewportState {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+					.viewportCount = 1, .scissorCount = 1, .flags = 0
+				};
 
-				VkPipelineRasterizationStateCreateInfo rasterizer{};
-				rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-				rasterizer.depthClampEnable = VK_FALSE;
-				rasterizer.rasterizerDiscardEnable = VK_FALSE;
-				rasterizer.polygonMode = polgyonTopology;
-				rasterizer.lineWidth = 1.0f;
-				rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-				rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-				rasterizer.depthBiasEnable = VK_FALSE;
+				VkPipelineRasterizationStateCreateInfo rasterizer {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+					.depthBiasEnable = VK_FALSE, .depthClampEnable = VK_FALSE, .rasterizerDiscardEnable = VK_FALSE,
+					.polygonMode = polgyonTopology, .lineWidth = 1.0f,
+					.cullMode = VK_CULL_MODE_BACK_BIT, .frontFace = VK_FRONT_FACE_CLOCKWISE
+				};
 
-				VkPipelineMultisampleStateCreateInfo multisampling{};
-				multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-				multisampling.sampleShadingEnable = VK_FALSE;
-				multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+				VkPipelineMultisampleStateCreateInfo multisampling {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+					.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT, .sampleShadingEnable = VK_FALSE,
+				};
 
-				VkPipelineColorBlendStateCreateInfo colorBlending{};
-				colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-				colorBlending.logicOpEnable = VK_FALSE;
-				colorBlending.logicOp = VK_LOGIC_OP_COPY;
-				colorBlending.attachmentCount = 1;
-
-				VkPipelineColorBlendAttachmentState blendDescription = colorBlendState;
-				colorBlending.pAttachments = &blendDescription;
-				colorBlending.blendConstants[0] = 0.0f;
-				colorBlending.blendConstants[1] = 0.0f;
-				colorBlending.blendConstants[2] = 0.0f;
-				colorBlending.blendConstants[3] = 0.0f;
+				VkPipelineColorBlendStateCreateInfo colorBlending {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+					.logicOpEnable = VK_FALSE, .logicOp = VK_LOGIC_OP_COPY,
+					.attachmentCount = 1, .pAttachments = &colorBlendState,
+					.blendConstants[0] = 0.0f, .blendConstants[1] = 0.0f, .blendConstants[2] = 0.0f, .blendConstants[3] = 0.0f
+				};
 
 				const std::array<VkDynamicState, 2> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-				VkPipelineDynamicStateCreateInfo dynamicState = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
-				dynamicState.flags = 0;
-				dynamicState.pDynamicStates = dynamicStateEnables.data();
-				dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size());
-				dynamicState.pNext = VK_NULL_HANDLE;
+				VkPipelineDynamicStateCreateInfo dynamicState {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+					.pDynamicStates = dynamicStateEnables.data(), .dynamicStateCount = static_cast<uint32_t>(dynamicStateEnables.size()),
+					.flags = 0, .pNext = VK_NULL_HANDLE
+				};
 
-				VkPipelineRenderingCreateInfoKHR renderingCreateInfo{};
-				renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-				renderingCreateInfo.colorAttachmentCount = 1;
-				renderingCreateInfo.pColorAttachmentFormats = &imageFormat;
-				renderingCreateInfo.depthAttachmentFormat = QueryDepthFormat();
+				VkPipelineRenderingCreateInfoKHR renderingCreateInfo {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+					.pColorAttachmentFormats = &imageFormat, .depthAttachmentFormat = QueryDepthFormat(), .colorAttachmentCount = 1
+				};
 
-				VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
-				depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-				depthStencilInfo.depthTestEnable = enableDepthTesting;
-				depthStencilInfo.depthWriteEnable = enableDepthTesting;
-				depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
-				depthStencilInfo.depthBoundsTestEnable = VK_FALSE;
-				depthStencilInfo.minDepthBounds = 0.0f; // Optional
-				depthStencilInfo.maxDepthBounds = 1.0f; // Optional
-				depthStencilInfo.stencilTestEnable = VK_FALSE;
-				depthStencilInfo.front = {}; // Optional
-				depthStencilInfo.back = {}; // Optional
+				VkPipelineDepthStencilStateCreateInfo depthStencilInfo {
+					.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+					.depthTestEnable = enableDepthTesting, .depthWriteEnable = enableDepthTesting,
+					.depthCompareOp = VK_COMPARE_OP_LESS, .depthBoundsTestEnable = VK_FALSE, .minDepthBounds = 0.0f, .maxDepthBounds = 1.0f,
+					.stencilTestEnable = VK_FALSE, .front = {}, .back = {},
+				};
 
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -265,30 +229,33 @@
 						break;
 					}
 
+					#if TINY_ENGINE_VALIDATION
+					std::cout << "TinyVulkan: Loading Shader @ " << std::get<1>(shaders[i]) << std::endl;
+					#endif
 					shaderModules.push_back(shaderModule);
-					shaderPipelineCreateInfo.push_back(CreateShaderInfo(std::get<1>(shaders[i]), shaderModule, std::get<0>(shaders[i])));
+					VkPipelineShaderStageCreateInfo shaderCreateInfo = {
+						.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = (VkShaderStageFlagBits)std::get<0>(shaders[i]), .module = shaderModule, .pName = "main"
+					};
+					shaderPipelineCreateInfo.push_back(shaderCreateInfo);
 				}
 				
-				VkGraphicsPipelineCreateInfo pipelineInfo{};
-				pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-				pipelineInfo.stageCount = static_cast<uint32_t>(shaderPipelineCreateInfo.size());
-				pipelineInfo.pStages = shaderPipelineCreateInfo.data();
-				pipelineInfo.pVertexInputState = &vertexInputInfo;
-				pipelineInfo.pInputAssemblyState = &inputAssembly;
-				pipelineInfo.pViewportState = &viewportState;
-				pipelineInfo.pRasterizationState = &rasterizer;
-				pipelineInfo.pMultisampleState = &multisampling;
-				pipelineInfo.pColorBlendState = &colorBlending;
-				pipelineInfo.pDepthStencilState = &depthStencilInfo;
-
-				pipelineInfo.pDynamicState = &dynamicState;
-				pipelineInfo.pNext = &renderingCreateInfo;
-
-				pipelineInfo.layout = pipelineLayout;
-				pipelineInfo.renderPass = VK_NULL_HANDLE;
-				pipelineInfo.subpass = 0;
-				pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-				pipelineInfo.basePipelineIndex = -1; // Optional
+				VkGraphicsPipelineCreateInfo pipelineInfo {
+					.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+					.stageCount = static_cast<uint32_t>(shaderPipelineCreateInfo.size()),
+					.pStages = shaderPipelineCreateInfo.data(),
+					.layout = pipelineLayout,
+					.pVertexInputState = &vertexInputInfo,
+					.pInputAssemblyState = &inputAssembly,
+					.pViewportState = &viewportState,
+					.pRasterizationState = &rasterizer,
+					.pMultisampleState = &multisampling,
+					.pColorBlendState = &colorBlending,
+					.pDepthStencilState = &depthStencilInfo,
+					.pDynamicState = &dynamicState,
+					.pNext = &renderingCreateInfo,
+					.renderPass = VK_NULL_HANDLE, .subpass = 0,
+					.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE,
+				};
 
 				if (result == VK_SUCCESS)
 					result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, VK_NULL_HANDLE, &graphicsPipeline);
@@ -300,116 +267,49 @@
 				return result;
 			}
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyGraphicsPipeline> Construct(TinyVkDevice& vkdevice, TinyVertexDescription vertexDescription, const std::vector<std::tuple<VkShaderStageFlagBits, std::string>> shaders, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges, bool enableDepthTesting = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkColorComponentFlags colorComponentFlags = VKCOMP_RGBA, VkPipelineColorBlendAttachmentState colorBlendState = GetBlendDescription(true), VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polgyonTopology = VK_POLYGON_MODE_FILL) {
+			inline static TinyObject<TinyGraphicsPipeline> Construct(TinyVkDevice& vkdevice, TinyVertexDescription vertexDescription, const std::vector<std::tuple<TinyShaderStages, std::string>> shaders, const std::vector<VkDescriptorSetLayoutBinding>& descriptorBindings, const std::vector<VkPushConstantRange>& pushConstantRanges, bool enableDepthTesting = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkColorComponentFlags colorComponentFlags = VKCOMP_RGBA_BITS, VkPipelineColorBlendAttachmentState colorBlendState = GetBlendDescription(true), VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polgyonTopology = VK_POLYGON_MODE_FILL) {
 				std::unique_ptr<TinyGraphicsPipeline> object =
 					std::make_unique<TinyGraphicsPipeline>(vkdevice, vertexDescription, shaders, descriptorBindings, pushConstantRanges, enableDepthTesting, imageFormat , colorComponentFlags, colorBlendState, vertexTopology, polgyonTopology);
-				return TinyConstruct<TinyGraphicsPipeline>(object, object->Initialize());
+				return TinyObject<TinyGraphicsPipeline>(object, object->Initialize());
 			}	
 
 			/// @brief Gets the number of bound descriptors for a particular shader stage.
-			inline static uint32_t SelectBindingCountByShaderStage(TinyGraphicsPipeline& pipeline, VkShaderStageFlags flags) {
+			inline static uint32_t SelectBindingCountByShaderStage(TinyGraphicsPipeline& pipeline, TinyShaderStages flags) {
 				return std::count_if(pipeline.descriptorBindings.begin(), pipeline.descriptorBindings.end(), [flags](VkDescriptorSetLayoutBinding binding) {
-					return binding.stageFlags == flags;
+					return binding.stageFlags == (VkShaderStageFlags) flags;
 				});
 			}
 
 			/// @brief Gets a generic Normal Blending Mode for creating a GraphicsPipeline with.
-			inline static const VkPipelineColorBlendAttachmentState GetBlendDescription(bool isBlendingEnabled = true) {
-				VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-				colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-				colorBlendAttachment.blendEnable = isBlendingEnabled;
-
-				colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-				colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-				colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-
-				colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-				colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-				colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-				return colorBlendAttachment;
+			inline static VkPipelineColorBlendAttachmentState GetBlendDescription(bool isBlendingEnabled = true) {
+				return {
+					.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+					.colorBlendOp = VK_BLEND_OP_ADD, .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA, .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+					.alphaBlendOp = VK_BLEND_OP_ADD, .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE, .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+					.blendEnable = isBlendingEnabled
+				};
 			}
 
 			/// @brief Returns the push constant range info of a given size applied to the given shader stages.
-			inline static VkPushConstantRange SelectPushConstantRange(uint32_t pushConstantRangeSize, VkShaderStageFlags shaderStages) {
-				VkPushConstantRange pushConstantRange{};
-				pushConstantRange.stageFlags = shaderStages;
-				pushConstantRange.offset = 0;
-				pushConstantRange.size = pushConstantRangeSize;
-				return pushConstantRange;
-			}
-
-			/// @brief Creates a layout description for how a descriptor should be bound to the graphics pipeline at hwta binding and shader stages./summary>
-			inline static VkDescriptorSetLayoutBinding SelectPushDescriptorLayoutBinding(uint32_t binding, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, uint32_t descriptorCount = 1) {
-				VkDescriptorSetLayoutBinding descriptorLayoutBinding {};
-				descriptorLayoutBinding.binding = binding;
-				descriptorLayoutBinding.descriptorCount = descriptorCount;
-				descriptorLayoutBinding.descriptorType = descriptorType;
-				descriptorLayoutBinding.pImmutableSamplers = VK_NULL_HANDLE;
-				descriptorLayoutBinding.stageFlags = stageFlags;
-				return descriptorLayoutBinding;
-			}
-
-			/// @brief Creates a generic write descriptor to represent data passed to the GPU when rendering (on myrenderer.PushDescriptorSet).
-			inline static VkWriteDescriptorSet SelectWriteDescriptor(uint32_t binding, uint32_t descriptorCount, VkDescriptorType descriptorType, const VkDescriptorImageInfo* imageInfo, const VkDescriptorBufferInfo* bufferInfo) {
-				VkWriteDescriptorSet writeDescriptorSets{};
-				writeDescriptorSets.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescriptorSets.dstSet = 0;
-				writeDescriptorSets.dstBinding = binding;
-				writeDescriptorSets.descriptorCount = descriptorCount;
-				writeDescriptorSets.descriptorType = descriptorType;
-				writeDescriptorSets.pImageInfo = imageInfo;
-				writeDescriptorSets.pBufferInfo = bufferInfo;
-				return writeDescriptorSets;
+			inline static VkPushConstantRange SelectPushConstantRange(uint32_t pushConstantRangeSize, TinyShaderStages shaderStages) {
+				return { .stageFlags = (VkShaderStageFlags) shaderStages, .offset = 0, .size = pushConstantRangeSize };
 			}
 
 			/// @brief Creates a write image descriptor (Combined Image Sampler) for passing images to the GPU (on myrenderer.PushDescriptorSet).
 			inline static VkWriteDescriptorSet SelectWriteImageDescriptor(uint32_t binding, uint32_t descriptorCount, const VkDescriptorImageInfo* imageInfo) {
-				VkWriteDescriptorSet writeDescriptorSets{};
-				writeDescriptorSets.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescriptorSets.dstSet = 0;
-				writeDescriptorSets.dstBinding = binding;
-				writeDescriptorSets.descriptorCount = descriptorCount;
-				writeDescriptorSets.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				writeDescriptorSets.pImageInfo = imageInfo;
-				return writeDescriptorSets;
+				return { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pImageInfo = imageInfo, .dstSet = 0, .dstBinding = binding, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = descriptorCount };
 			}
 
 			/// @brief Creates a write buffer descriptor (any of VK_DESCRIPTOR_TYPE_*_BUFFER) for passing buffers to the GPU (on myrenderer.PushDescriptorSet).
 			inline static VkWriteDescriptorSet SelectWriteBufferDescriptor(uint32_t binding, uint32_t descriptorCount, const VkDescriptorBufferInfo* bufferInfo) {
-				VkWriteDescriptorSet writeDescriptorSets{};
-				writeDescriptorSets.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescriptorSets.dstSet = 0;
-				writeDescriptorSets.dstBinding = binding;
-				writeDescriptorSets.descriptorCount = descriptorCount;
-				writeDescriptorSets.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-				writeDescriptorSets.pBufferInfo = bufferInfo;
-				return writeDescriptorSets;
+				return { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .pBufferInfo = bufferInfo, .dstSet = 0, .dstBinding = binding, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = descriptorCount };
 			}
 		
 			/// @brief Creates a layout description for how a descriptor should be bound to the graphics pipeline at hwta binding and shader stages./summary>
-			inline static VkDescriptorSetLayoutBinding SelectPushDescriptorLayoutBinding(uint32_t binding, TinyDescriptorType descriptorType, VkShaderStageFlags stageFlags, uint32_t descriptorCount = 1) {
-				VkDescriptorSetLayoutBinding descriptorLayoutBinding {};
-				descriptorLayoutBinding.binding = binding;
-				descriptorLayoutBinding.descriptorCount = descriptorCount;
-				descriptorLayoutBinding.descriptorType = static_cast<VkDescriptorType>(descriptorType);
-				descriptorLayoutBinding.pImmutableSamplers = VK_NULL_HANDLE;
-				descriptorLayoutBinding.stageFlags = stageFlags;
-				return descriptorLayoutBinding;
-			}
-
-			/// @brief Creates a generic write descriptor to represent data passed to the GPU when rendering (on myrenderer.PushDescriptorSet).
-			inline static VkWriteDescriptorSet SelectWriteDescriptor(uint32_t binding, uint32_t descriptorCount, TinyDescriptorType descriptorType, const VkDescriptorImageInfo* imageInfo, const VkDescriptorBufferInfo* bufferInfo) {
-				VkWriteDescriptorSet writeDescriptorSets{};
-				writeDescriptorSets.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				writeDescriptorSets.dstSet = 0;
-				writeDescriptorSets.dstBinding = binding;
-				writeDescriptorSets.descriptorCount = descriptorCount;
-				writeDescriptorSets.descriptorType = static_cast<VkDescriptorType>(descriptorType);
-				writeDescriptorSets.pImageInfo = imageInfo;
-				writeDescriptorSets.pBufferInfo = bufferInfo;
-				return writeDescriptorSets;
+			inline static VkDescriptorSetLayoutBinding SelectPushDescriptorLayoutBinding(uint32_t binding, TinyDescriptorType descriptorType, TinyShaderStages stageFlags, uint32_t descriptorCount = 1) {
+				return { .binding = binding, .descriptorType = static_cast<VkDescriptorType>(descriptorType), .descriptorCount = descriptorCount, .pImmutableSamplers = VK_NULL_HANDLE, .stageFlags = (VkShaderStageFlags) stageFlags };
 			}
 		};
 	}

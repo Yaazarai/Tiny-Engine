@@ -20,17 +20,17 @@
 
             /// @brief Creates a reference context for the render pipeline for TinyRenderer/TinySwapchain.
             TinyRenderContext(TinyVkDevice& vkdevice, TinyCommandPool& commandPool, TinyGraphicsPipeline& graphicsPipeline)
-                : vkdevice(vkdevice), commandPool(commandPool), graphicsPipeline(graphicsPipeline) {}
+            : vkdevice(vkdevice), commandPool(commandPool), graphicsPipeline(graphicsPipeline) {}
 
 			/// @brief Default initialize() does nothing for TinyRenderContext.
             VkResult Initialize() { return VK_SUCCESS; }
             
-            /// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+            /// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyRenderContext> Construct(TinyVkDevice& vkdevice, TinyCommandPool& commandPool, TinyGraphicsPipeline& graphicsPipeline) {
+			inline static TinyObject<TinyRenderContext> Construct(TinyVkDevice& vkdevice, TinyCommandPool& commandPool, TinyGraphicsPipeline& graphicsPipeline) {
 				std::unique_ptr<TinyRenderContext> object =
 					std::make_unique<TinyRenderContext>(vkdevice, commandPool, graphicsPipeline);
-				return TinyConstruct<TinyRenderContext>(object, object->Initialize());
+				return TinyObject<TinyRenderContext>(object, object->Initialize());
 			}
         };
     }

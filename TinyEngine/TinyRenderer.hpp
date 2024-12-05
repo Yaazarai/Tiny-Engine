@@ -47,8 +47,8 @@
 			}
 
 			/// @brief Records Push Constants to the command buffer.
-			void PushConstants(VkCommandBuffer cmdBuffer, VkShaderStageFlagBits shaderFlags, uint32_t byteSize, const void* pValues) {
-				vkCmdPushConstants(cmdBuffer, renderContext.graphicsPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, byteSize, pValues);
+			void PushConstants(VkCommandBuffer cmdBuffer, TinyShaderStages shaderFlags, uint32_t byteSize, const void* pValues) {
+				vkCmdPushConstants(cmdBuffer, renderContext.graphicsPipeline.pipelineLayout, (VkShaderStageFlagBits) shaderFlags, 0, byteSize, pValues);
 			}
 
 			/// @brief Records Push Descriptors to the command buffer.
@@ -68,45 +68,41 @@
                 
                 renderTarget->TransitionLayoutBarrier(commandBuffer, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_COLOR_ATTACHMENT);
 
-				VkRenderingAttachmentInfoKHR colorAttachmentInfo{};
-				colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-				colorAttachmentInfo.imageView = renderTarget->imageView;
-				colorAttachmentInfo.imageLayout = (VkImageLayout) renderTarget->imageLayout;
-				colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-				colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-				colorAttachmentInfo.clearValue = clearColor;
+				VkRenderingAttachmentInfoKHR colorAttachmentInfo {
+					.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+					.imageView = renderTarget->imageView, .imageLayout = (VkImageLayout) renderTarget->imageLayout,
+					.clearValue = clearColor, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+				};
 
-				VkRenderingInfoKHR dynamicRenderInfo{};
-				dynamicRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+				VkRect2D renderAreaKHR {
+					.extent = { static_cast<uint32_t>(renderTarget->width), static_cast<uint32_t>(renderTarget->height) }, .offset = { 0,0 }
+				};
 
-				VkRect2D renderAreaKHR{};
-				renderAreaKHR.extent = { static_cast<uint32_t>(renderTarget->width), static_cast<uint32_t>(renderTarget->height) };
-				renderAreaKHR.offset = { 0,0 };
-				dynamicRenderInfo.renderArea = renderAreaKHR;
-				dynamicRenderInfo.layerCount = 1;
-				dynamicRenderInfo.colorAttachmentCount = 1;
-				dynamicRenderInfo.pColorAttachments = &colorAttachmentInfo;
+				VkRenderingInfoKHR dynamicRenderInfo {
+					.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
+					.renderArea = renderAreaKHR,
+					.layerCount = 1,
+					.colorAttachmentCount = 1,
+					.pColorAttachments = &colorAttachmentInfo
+				};
 
-				VkRenderingAttachmentInfoKHR depthStencilAttachmentInfo{};
+				VkRenderingAttachmentInfoKHR depthStencilAttachmentInfo {};
 				if (renderContext.graphicsPipeline.enableDepthTesting) {
                     optionalDepthImage->TransitionLayoutBarrier(commandBuffer, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_DEPTHSTENCIL_ATTACHMENT);
 
-                    depthStencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-					depthStencilAttachmentInfo.imageView = optionalDepthImage->imageView;
-					depthStencilAttachmentInfo.imageLayout = (VkImageLayout) optionalDepthImage->imageLayout;
-					depthStencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-					depthStencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-					depthStencilAttachmentInfo.clearValue = depthStencil;
+                    depthStencilAttachmentInfo = {
+						.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+						.imageView = optionalDepthImage->imageView, .imageLayout = (VkImageLayout) optionalDepthImage->imageLayout,
+						.clearValue = depthStencil, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+					};
 					dynamicRenderInfo.pDepthAttachment = &depthStencilAttachmentInfo;
                 }
 
-				VkViewport dynamicViewportKHR{};
-				dynamicViewportKHR.x = 0;
-				dynamicViewportKHR.y = 0;
-				dynamicViewportKHR.width = static_cast<float>(renderTarget->width);
-				dynamicViewportKHR.height = static_cast<float>(renderTarget->height);
-				dynamicViewportKHR.minDepth = 0.0f;
-				dynamicViewportKHR.maxDepth = 1.0f;
+				VkViewport dynamicViewportKHR {
+					.x = 0, .y = 0, .minDepth = 0.0f, .maxDepth = 1.0f,
+					.width = static_cast<float>(renderTarget->width), .height = static_cast<float>(renderTarget->height),
+				};
+
 				vkCmdSetViewport(commandBuffer, 0, 1, &dynamicViewportKHR);
 				vkCmdSetScissor(commandBuffer, 0, 1, &renderAreaKHR);
                 
@@ -183,10 +179,8 @@
 			/// @brief Acquires the target's mutex lock and executes the registered onRenderEvents and renders them to the target image/texture.
 			VkResult RenderExecuteThreadSafe() {
 				TinyTimedGuard imageLock(renderTarget->image_lock);
-				if (!imageLock.signaled()) {
-					throw TinyRuntimeError(VK_ERROR_OUT_OF_DATE_KHR, "TinyVulkan: could not acquire lock for renderer! Running in another thread?");
+				if (!imageLock.signaled())
 					return VK_ERROR_OUT_OF_DATE_KHR;
-				}
 				return RenderExecute();
 			}
 
@@ -195,12 +189,12 @@
 				return SetRenderTarget(commandPool, renderTarget, optionalDepthImage, false);
 			}
 
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyConstruct<Object,VkResult>.
+			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyConstruct<TinyRenderer> Construct(TinyRenderContext& renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE) {
+			inline static TinyObject<TinyRenderer> Construct(TinyRenderContext& renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE) {
 				std::unique_ptr<TinyRenderer> object =
 					std::make_unique<TinyRenderer>(renderContext, cmdPool, renderTarget, optionalDepthImage);
-				return TinyConstruct<TinyRenderer>(object, object->Initialize());
+				return TinyObject<TinyRenderer>(object, object->Initialize());
 			}	
         };
     }
