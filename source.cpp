@@ -21,7 +21,7 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyObject<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 640, 480, true, false, true, 640, 480);
     TinyObject<TinyVkDevice> vkdevice = TinyVkDevice::Construct(true, false, true, window);
     TinyObject<TinyCommandPool> cmdpool = TinyCommandPool::Construct(vkdevice, false);
-    TinyObject<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, false);
+    TinyObject<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, true);
     TinyObject<TinyRenderContext> context = TinyRenderContext::Construct(vkdevice, cmdpool, pipeline);
     TinyObject<TinySwapchain> swapchain = TinySwapchain::Construct(context, window, TinyBufferingMode::MODE_DOUBLE);
     
@@ -97,8 +97,8 @@ int TINY_ENGINE_WINDOWMAIN {
         swapchain.ref().BeginRecordCmdBuffer(commandBuffer.first);
         
             int offsetx = 0, offsety = 0;
-            offsetx = glm::sin(glm::radians(static_cast<glm::float32>(angle))) * 64;
-            offsety = glm::cos(glm::radians(static_cast<glm::float32>(angle))) * 64;
+            //offsetx = glm::sin(glm::radians(static_cast<glm::float32>(angle))) * 64;
+            //offsety = glm::cos(glm::radians(static_cast<glm::float32>(angle))) * 64;
 
             //offsetx = glfwGetGamepadAxis(TinyGamepads::GPAD_01,TinyGamepadAxis::AXIS_LEFTX) * 64;
             //offsety = glfwGetGamepadAxis(TinyGamepads::GPAD_01,TinyGamepadAxis::AXIS_LEFTY) * 64;

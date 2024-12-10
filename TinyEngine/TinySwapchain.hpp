@@ -145,7 +145,7 @@
 
 				imageSources.resize(imageCount);
 				for(uint32_t i = 0; i < imageCount; i++)
-					imageSources[i] = new TinyImage(renderContext, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+					imageSources[i] = new TinyImage(renderContext, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, VK_FORMAT_B8G8R8A8_UNORM , VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
 
 				imageFormat = surfaceFormat.format;
 				imageExtent = extent;
@@ -394,8 +394,11 @@
 				}
 				
 				if (renderContext.graphicsPipeline.enableDepthTesting)
-					for(size_t i = 0; i < static_cast<size_t>(bufferingMode); i++)
-						imageDepthSources.push_back(new TinyImage(renderContext, TinyImageType::TYPE_DEPTHSTENCIL, imageExtent.width, imageExtent.height, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_REPEAT));
+					for(size_t i = 0; i < static_cast<size_t>(bufferingMode); i++) {
+						TinyImage* depthImage = new TinyImage(renderContext, TinyImageType::TYPE_DEPTHSTENCIL, imageExtent.width, imageExtent.height, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_REPEAT, false, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+						depthImage->Initialize();
+						imageDepthSources.push_back(depthImage);
+					}
 				
 				VkResult result = CreateSwapChain();
                 if (result != VK_SUCCESS)

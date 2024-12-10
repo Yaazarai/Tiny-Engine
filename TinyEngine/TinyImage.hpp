@@ -16,6 +16,7 @@
 			TinyImageLayout imageLayout;
 			VkImageAspectFlags aspectFlags;
 			VkSamplerAddressMode addressingMode;
+			bool textureInterpolation;
 
 			VkSemaphore imageAvailable;
 			VkSemaphore imageFinished;
@@ -49,8 +50,8 @@
 			}
 
 			/// @brief Creates a VkImage for rendering or loading image files (stagedata) into.
-			TinyImage(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE)
-			: renderContext(renderContext), imageType(type), width(width), height(height), image(imageSource), imageView(imageViewSource), imageSampler(imageSampler), imageAvailable(imageAvailable), imageFinished(imageFinished), imageWaitable(imageWaitable), format(format), imageLayout(TinyImageLayout::LAYOUT_UNDEFINED), addressingMode(addressingMode), aspectFlags(aspectFlags) {
+			TinyImage(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE)
+			: renderContext(renderContext), imageType(type), width(width), height(height), image(imageSource), imageView(imageViewSource), imageSampler(imageSampler), imageAvailable(imageAvailable), imageFinished(imageFinished), imageWaitable(imageWaitable), format(format), imageLayout(TinyImageLayout::LAYOUT_UNDEFINED), addressingMode(addressingMode), textureInterpolation(textureInterpolation), aspectFlags(aspectFlags) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 			}
 
@@ -68,13 +69,17 @@
 				VkPhysicalDeviceProperties properties {};
 				vkGetPhysicalDeviceProperties(renderContext.vkdevice.physicalDevice, &properties);
 
+				VkFilter filter = (textureInterpolation == true)? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+				VkSamplerMipmapMode mipmapMode = (textureInterpolation)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+				float interpolationWeight = (textureInterpolation)? VK_LOD_CLAMP_NONE : 0.0f;
+
 				VkSamplerCreateInfo samplerInfo {
 					.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-					.magFilter = VK_FILTER_LINEAR, .minFilter = VK_FILTER_LINEAR,
+					.magFilter = filter, .minFilter = filter,
 					.anisotropyEnable = VK_FALSE, .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
 					.addressModeU = addressingMode, .addressModeV = addressingMode, .addressModeW = addressingMode, .unnormalizedCoordinates = VK_FALSE,
 					.compareEnable = VK_FALSE, .compareOp = VK_COMPARE_OP_ALWAYS,
-					.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR, .mipLodBias = 0.0f, .minLod = 0.0f, .maxLod = 0.0f,
+					.mipmapMode = mipmapMode, .mipLodBias = 0.0f, .minLod = 0.0f, .maxLod = interpolationWeight,
 					.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
 				};
 
@@ -94,7 +99,7 @@
 			}
             
             /// @brief Recreates this TinyImage using a new layout/format (don't forget to call image.Disposable(bool waitIdle) to dispose of the previous image first.
-			VkResult ReCreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) {
+			VkResult ReCreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false) {
 				if (type == TinyImageType::TYPE_SWAPCHAIN)
 					return VK_ERROR_INITIALIZATION_FAILED;
 
@@ -116,7 +121,9 @@
 					case TinyImageType::TYPE_DEPTHSTENCIL:
 						newLayout = TinyImageLayout::LAYOUT_DEPTHSTENCIL_ATTACHMENT;
 						imgCreateInfo.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-						aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+						aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+						if (format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT)
+							aspectFlags |= VK_IMAGE_ASPECT_STENCIL_BIT;
 					break;
 					case TinyImageType::TYPE_STORAGE:
 						newLayout = TinyImageLayout::LAYOUT_GENERAL;
@@ -139,6 +146,8 @@
 				allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 				allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 				allocCreateInfo.priority = 1.0f;
+
+				this->textureInterpolation = textureInterpolation;
 				
 				VkResult result = vmaCreateImage(renderContext.vkdevice.memoryAllocator, &imgCreateInfo, &allocCreateInfo, &image, &memory, VK_NULL_HANDLE);
 				if (result != VK_SUCCESS) return result;
@@ -410,9 +419,9 @@
 
 			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyObject<TinyImage> Construct(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE) {
+			inline static TinyObject<TinyImage> Construct(TinyRenderContext& renderContext, TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE, VkSemaphore imageAvailable = VK_NULL_HANDLE, VkSemaphore imageFinished = VK_NULL_HANDLE, VkFence imageWaitable = VK_NULL_HANDLE) {
 				std::unique_ptr<TinyImage> object =
-					std::make_unique<TinyImage>(renderContext, type, width, height, imageSource, imageViewSource, imageSampler, imageAvailable, imageFinished, imageWaitable, format, addressingMode);
+					std::make_unique<TinyImage>(renderContext, type, width, height, format, addressingMode, textureInterpolation, imageSource, imageViewSource, imageSampler, imageAvailable, imageFinished, imageWaitable);
 				return TinyObject<TinyImage>(object, object->Initialize());
 			}
 		};

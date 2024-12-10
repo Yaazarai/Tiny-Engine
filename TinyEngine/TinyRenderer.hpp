@@ -138,7 +138,7 @@
 				if (renderContext.graphicsPipeline.enableDepthTesting)
                     if (optionalDepthImage->width != renderTarget->width || optionalDepthImage->height != renderTarget->height) {
 						optionalDepthImage->Disposable(false);
-						optionalDepthImage->ReCreateImage(optionalDepthImage->imageType, renderTarget->width, renderTarget->height, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+						optionalDepthImage->ReCreateImage(optionalDepthImage->imageType, renderTarget->width, renderTarget->height, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
 					}
 				
 				commandPool->ReturnAllBuffers();
