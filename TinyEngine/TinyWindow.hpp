@@ -6,7 +6,7 @@
     namespace TINY_ENGINE_NAMESPACE {
 		class TinyWindow : public TinyDisposable {
 		public:
-            bool hwndResizable, hwndMinSize, hwndTransparent;
+            bool hwndResizable, hwndMinSize, hwndTransparent, hwndBordered, hwndFullscreen;
 			int hwndWidth, hwndHeight, hwndXpos, hwndYpos;
             int minWidth, minHeight;
             std::string hwndTitle;
@@ -42,8 +42,8 @@
 			}
 
 			/// @brief Create managed GLFW Window and Vulkan API. Initializes GLFW: Must call Initialize() manually.
-			TinyWindow(std::string title, int width, int height, bool resizable, bool transparent = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200)
-			: hwndResizable(resizable), hwndTransparent(transparent), hwndMinSize(hasMinSize), hwndWidth(width), hwndHeight(height), minWidth(minWidth), minHeight(minHeight), hwndTitle(title), hwndWindow(VK_NULL_HANDLE) {
+			TinyWindow(std::string title, int width, int height, bool resizable, bool transparent = false, bool bordered = true, bool fullscreen = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200)
+			: hwndResizable(resizable), hwndTransparent(transparent), hwndBordered(bordered), hwndFullscreen(fullscreen), hwndMinSize(hasMinSize), hwndWidth(width), hwndHeight(height), minWidth(minWidth), minHeight(minHeight), hwndTitle(title), hwndWindow(VK_NULL_HANDLE) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose){this->Disposable(forceDispose); }));
 				onWindowResized.hook(TinyCallback<GLFWwindow*, int, int>([this](GLFWwindow* hwnd, int width, int height) { if (hwnd != hwndWindow) return; hwndWidth = width; hwndHeight = height; }));
 				onWindowPositionMoved.hook(TinyCallback<GLFWwindow*, int, int>([this](GLFWwindow* hwnd, int xpos, int ypos) { if (hwnd != hwndWindow) return; hwndXpos = xpos; hwndYpos = ypos; }));
@@ -72,7 +72,7 @@
 				hwndWidth = width;
 				hwndHeight = height;
 			}
-
+			
 			/// @brief Checks if the GLFW window should continue executing (true) or close (false).
 			bool ShouldExecute() { return glfwWindowShouldClose(hwndWindow) != GLFW_TRUE; }
 
@@ -100,21 +100,68 @@
 					{ glfwPollEvents(); } else { glfwWaitEvents(); }
 				}
 			}
+			
+			void SetWindowMode(bool bordered = true, bool fullscreen = false) {
+				hwndBordered = bordered;
+				hwndFullscreen = fullscreen;
 
-            /// @brief Initializes and Displays the GLFW window and sets its properties.
+				int overlap, count, primary = 0;
+				glfwGetWindowPos(hwndWindow, &hwndXpos, &hwndYpos);
+				glfwGetWindowSize(hwndWindow, &hwndWidth, &hwndHeight);
+				GLFWmonitor** monitor = glfwGetMonitors(&count);
+
+				for(int i = 0; i < count; i++) {
+					int overlapw, overlaph, overlapa, monitorX, monitorY, monitorW, monitorH;
+					glfwGetMonitorPos(monitor[i], &monitorX, &monitorY);
+					const GLFWvidmode* mode = glfwGetVideoMode(monitor[i]);
+					monitorW = mode->width;
+					monitorH = mode->height;
+					
+					overlapw = std::max(monitorX, hwndXpos) - std::min(monitorX+monitorW, hwndXpos+hwndWidth);
+					overlaph = std::max(monitorY, hwndYpos) - std::min(monitorY+monitorH, hwndYpos+hwndHeight);
+
+					if (overlapw <= 0 && overlaph <= 0) {
+						overlapw = std::abs(overlapw);
+						overlaph = std::abs(overlaph);
+						overlapa = overlapw * overlaph;
+
+						if (overlapa > overlap) {
+							overlap = overlapa;
+							primary = std::max(0, std::min(i, count - 1));
+						}
+					}
+				}
+				
+				glfwSetWindowMonitor(hwndWindow, (hwndFullscreen)? monitor[primary] : nullptr, hwndXpos, hwndYpos, hwndWidth, hwndHeight, GLFW_DONT_CARE);
+				glfwSetWindowAttrib(hwndWindow, GLFW_DECORATED, (hwndBordered) ? GLFW_TRUE : GLFW_FALSE);
+			}
+
+            void ToggleFullscreen(int monitorIndex = 0) {
+				hwndFullscreen = !hwndFullscreen;
+				SetWindowMode(hwndBordered, hwndFullscreen);
+			}
+
+			void ToggleBordered() {
+				hwndBordered = !hwndBordered;
+				SetWindowMode(hwndBordered, hwndFullscreen);
+			}
+			
+			/// @brief Initializes and Displays the GLFW window and sets its properties.
 			VkResult Initialize() {
 				glfwInit();
                 if (glfwVulkanSupported()) {
                     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
                     glfwWindowHint(GLFW_RESIZABLE, (hwndResizable) ? GLFW_TRUE : GLFW_FALSE);
                     glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, (hwndTransparent) ? GLFW_TRUE : GLFW_FALSE);
-
-                    hwndWindow = glfwCreateWindow(hwndWidth, hwndHeight, hwndTitle.c_str(), VK_NULL_HANDLE, VK_NULL_HANDLE);
+					
+					hwndWindow = glfwCreateWindow(hwndWidth, hwndHeight, hwndTitle.c_str(), VK_NULL_HANDLE, VK_NULL_HANDLE);
                     glfwSetWindowUserPointer(hwndWindow, this);
                     glfwSetFramebufferSizeCallback(hwndWindow, TinyWindow::OnFrameBufferNotifyReSizeCallback);
                     glfwSetWindowPosCallback(hwndWindow, TinyWindow::OnWindowPositionCallback);
 
                     if (hwndMinSize) glfwSetWindowSizeLimits(hwndWindow, minWidth, minHeight, GLFW_DONT_CARE, GLFW_DONT_CARE);
+
+					SetWindowMode(hwndBordered, hwndFullscreen);
                     return VK_SUCCESS;
                 }
 
@@ -123,9 +170,9 @@
 			
 			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyObject<TinyWindow> Construct(std::string title, int width, int height, bool resizable, bool transparent  = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200) {
+			inline static TinyObject<TinyWindow> Construct(std::string title, int width, int height, bool resizable, bool transparent  = false, bool bordered = true, bool fullscreen = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200) {
 				std::unique_ptr<TinyWindow> object =
-					std::make_unique<TinyWindow>(title, width, height, resizable, transparent, hasMinSize, minWidth, minHeight);
+					std::make_unique<TinyWindow>(title, width, height, resizable, transparent, bordered, fullscreen, hasMinSize, minWidth, minHeight);
 				return TinyObject<TinyWindow>(object, object->Initialize());
 			}
         };

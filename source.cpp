@@ -18,12 +18,13 @@ const std::vector<VkDescriptorSetLayoutBinding> pushDescriptorLayouts = {
 };
 
 int TINY_ENGINE_WINDOWMAIN {
-    TinyObject<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 640, 480, true, false, true, 640, 480);
+    TinyObject<TinyWindow> window = TinyWindow::Construct("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
     TinyObject<TinyVkDevice> vkdevice = TinyVkDevice::Construct(true, false, true, window);
     TinyObject<TinyCommandPool> cmdpool = TinyCommandPool::Construct(vkdevice, false);
-    TinyObject<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, true);
+    TinyObject<TinyGraphicsPipeline> pipeline = TinyGraphicsPipeline::Construct(vkdevice, vertexDescription, defaultShaders, pushDescriptorLayouts, pushConstantRanges, false);
     TinyObject<TinyRenderContext> context = TinyRenderContext::Construct(vkdevice, cmdpool, pipeline);
     TinyObject<TinySwapchain> swapchain = TinySwapchain::Construct(context, window, TinyBufferingMode::MODE_DOUBLE);
+    //swapchain.ref().PushPresentMode(VK_PRESENT_MODE_FIFO_KHR);
     
     qoi_desc texture_sheet;
     void* texture_data = qoi_read(DEFAULT_TEXTURE, &texture_sheet, 0);
@@ -31,7 +32,7 @@ int TINY_ENGINE_WINDOWMAIN {
     width = texture_sheet.width;
     height = texture_sheet.height;
     channels = texture_sheet.channels;
-
+    
     // START IN COLOR_ATTACHEMENT LAYOUT FOR CPU-SIDE WRITE, THEN TRANSITION TO SHADER_READONLY FOR FRAGMENT SHADER.
     TinyObject<TinyImage> texture = TinyImage::Construct(context.ref(), TinyImageType::TYPE_COLORATTACHMENT, width, height);
     texture.ref().StageImageData(texture_data, width * height * channels);
@@ -86,19 +87,22 @@ int TINY_ENGINE_WINDOWMAIN {
 
     VkClearValue clearColor{ .color.float32 = { 0.0, 0.0, 0.5, 1.0 } };
     VkClearValue depthStencil{ .depthStencil = { 1.0f, 0 } };
+
+    //std::cout << "Set Target Check Error: " << swapchain.ref().SetRenderTarget(context, cmdpool, swapchain.ref().imageSources[0], VK_NULL_HANDLE, false) << std::endl;
     
     // TESTING RENDERCONTEXT CHANGES WITH THE SWAPCHAIN RENDERER.
+    float current_time, previous_time;
     int angle = 0;
     swapchain.ref().onRenderEvents.hook(TinyCallback<TinyCommandPool&>(
-        [&angle, &texture, &triangles, &indices, &vkdevice, &window, &swapchain, &pipeline, &queue, &vbuffer, &ibuffer, &clearColor](TinyCommandPool& commandPool) {
+        [&current_time, &previous_time, &angle, &texture, &triangles, &indices, &vkdevice, &window, &swapchain, &pipeline, &queue, &vbuffer, &ibuffer, &clearColor](TinyCommandPool& commandPool) {
         auto frame = queue.GetFrameResource();
 
         auto commandBuffer = commandPool.LeaseBuffer();
         swapchain.ref().BeginRecordCmdBuffer(commandBuffer.first);
         
             int offsetx = 0, offsety = 0;
-            //offsetx = glm::sin(glm::radians(static_cast<glm::float32>(angle))) * 64;
-            //offsety = glm::cos(glm::radians(static_cast<glm::float32>(angle))) * 64;
+            offsetx = glm::sin(glm::radians(static_cast<glm::float32>(angle))) * 96;
+            offsety = glm::cos(glm::radians(static_cast<glm::float32>(angle))) * 96;
 
             //offsetx = glfwGetGamepadAxis(TinyGamepads::GPAD_01,TinyGamepadAxis::AXIS_LEFTX) * 64;
             //offsety = glfwGetGamepadAxis(TinyGamepads::GPAD_01,TinyGamepadAxis::AXIS_LEFTY) * 64;
@@ -133,7 +137,17 @@ int TINY_ENGINE_WINDOWMAIN {
             swapchain.ref().CmdDrawGeometry(commandBuffer.first, true, 2, indices.size());
         
         swapchain.ref().EndRecordCmdBuffer(commandBuffer.first);
-        angle += 1;
+
+        std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch());
+        current_time = (float) ms.count();
+        
+        angle ++;
+
+        if (current_time >= previous_time + 1000.0) {
+            std::cout << "Frame Count: " << angle << std::endl;
+            previous_time = current_time;
+            angle = 0;
+        }
 
         //if (angle % 200 == 0) swapchain.ref().PushPresentMode(VK_PRESENT_MODE_IMMEDIATE_KHR);
         //if (angle % 400 == 0) swapchain.ref().PushPresentMode(VK_PRESENT_MODE_FIFO_KHR);
@@ -142,8 +156,13 @@ int TINY_ENGINE_WINDOWMAIN {
     // MULTI-THREADED: (window events on main, rendering on secondary)
     std::thread mythread([&window, &swapchain]() { while (window.ref().ShouldExecute()) {
         VkResult result = swapchain.ref().RenderExecute();
-    } });
+    }});
     window.ref().WhileMain(TinyWindowEvents::WAIT_EVENTS);
     mythread.join();
+    
+    //window.ref().onWhileMain.hook(TinyCallback<std::atomic_bool&>([&swapchain](std::atomic_bool& flag) {
+    //    VkResult result = swapchain.ref().RenderExecute();
+    //}));
+    //window.ref().WhileMain(TinyWindowEvents::POLL_EVENTS);
     return VK_SUCCESS;
 };

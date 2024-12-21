@@ -10,10 +10,9 @@
 			TinyImage* optionalDepthImage;
 			TinyImage* renderTarget;
 			TinyCommandPool* commandPool;
+			TinyRenderContext* renderContext;
 
 		public:
-			TinyRenderContext& renderContext;
-
             /// Invokable Render Events: (executed in TinyRenderer::RenderExecute()
 			TinyInvokable<TinyCommandPool&> onRenderEvents;
 
@@ -27,20 +26,24 @@
 			~TinyRenderer() {}
             
             /// @brief Simple render-to-image graphics pipeline renderer.
-			TinyRenderer(TinyRenderContext& renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE)
+			TinyRenderer(TinyRenderContext* renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE)
             : renderContext(renderContext), commandPool(cmdPool), renderTarget(renderTarget), optionalDepthImage(optionalDepthImage) {}
 
 			/// @brief Sets the target image/texture for the TinyImageRenderer.
-			VkResult SetRenderTarget(TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE, bool waitOldTarget = true) {
-				if (this->renderTarget != VK_NULL_HANDLE && waitOldTarget) {
-					vkWaitForFences(renderContext.vkdevice.logicalDevice, 1, &renderTarget->imageWaitable, VK_TRUE, UINT64_MAX);
-					vkResetFences(renderContext.vkdevice.logicalDevice, 1, &renderTarget->imageWaitable);
-				}
-
-                if (renderContext.graphicsPipeline.enableDepthTesting && optionalDepthImage == VK_NULL_HANDLE)
+			VkResult SetRenderTarget(TinyRenderContext* renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE, bool waitOldTarget = true) {
+				if (renderContext == VK_NULL_HANDLE || renderTarget == VK_NULL_HANDLE)
+					return VK_ERROR_INITIALIZATION_FAILED;
+				
+				if (renderContext->graphicsPipeline.enableDepthTesting && optionalDepthImage == VK_NULL_HANDLE)
                     return VK_ERROR_INITIALIZATION_FAILED;
+
+				if (waitOldTarget) {
+					vkWaitForFences(this->renderContext->vkdevice.logicalDevice, 1, &this->renderTarget->imageWaitable, VK_TRUE, UINT64_MAX);
+					vkResetFences(this->renderContext->vkdevice.logicalDevice, 1, &this->renderTarget->imageWaitable);
+				}
                 
-                this->commandPool = cmdPool;
+                this->renderContext = renderContext;
+				this->commandPool = cmdPool;
 				this->renderTarget = renderTarget;
                 this->optionalDepthImage = optionalDepthImage;
 				return VK_SUCCESS;
@@ -48,12 +51,12 @@
 
 			/// @brief Records Push Constants to the command buffer.
 			void PushConstants(VkCommandBuffer cmdBuffer, TinyShaderStages shaderFlags, uint32_t byteSize, const void* pValues) {
-				vkCmdPushConstants(cmdBuffer, renderContext.graphicsPipeline.pipelineLayout, (VkShaderStageFlagBits) shaderFlags, 0, byteSize, pValues);
+				vkCmdPushConstants(cmdBuffer, renderContext->graphicsPipeline.pipelineLayout, (VkShaderStageFlagBits) shaderFlags, 0, byteSize, pValues);
 			}
 
 			/// @brief Records Push Descriptors to the command buffer.
 			void PushDescriptorSet(VkCommandBuffer cmdBuffer, std::vector<VkWriteDescriptorSet> writeDescriptorSets) {
-				vkCmdPushDescriptorSetEKHR(renderContext.vkdevice.instance, cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderContext.graphicsPipeline.pipelineLayout, 0, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data());
+				vkCmdPushDescriptorSetEKHR(renderContext->vkdevice.instance, cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderContext->graphicsPipeline.pipelineLayout, 0, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data());
 			}
             
 			/// @brief Begins recording render commands to the provided command buffer.
@@ -87,7 +90,7 @@
 				};
 
 				VkRenderingAttachmentInfoKHR depthStencilAttachmentInfo {};
-				if (renderContext.graphicsPipeline.enableDepthTesting) {
+				if (renderContext->graphicsPipeline.enableDepthTesting) {
                     optionalDepthImage->TransitionLayoutBarrier(commandBuffer, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_DEPTHSTENCIL_ATTACHMENT);
 
                     depthStencilAttachmentInfo = {
@@ -106,20 +109,20 @@
 				vkCmdSetViewport(commandBuffer, 0, 1, &dynamicViewportKHR);
 				vkCmdSetScissor(commandBuffer, 0, 1, &renderAreaKHR);
                 
-                result = vkCmdBeginRenderingEKHR(renderContext.vkdevice.instance, commandBuffer, &dynamicRenderInfo);
+                result = vkCmdBeginRenderingEKHR(renderContext->vkdevice.instance, commandBuffer, &dynamicRenderInfo);
 				if (result != VK_SUCCESS) return result;
 				
-				vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderContext.graphicsPipeline.graphicsPipeline);
+				vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderContext->graphicsPipeline.graphicsPipeline);
                 return VK_SUCCESS;
 			}
 
 			/// @brief Ends recording render commands to the provided command buffer.
 			VkResult EndRecordCmdBuffer(VkCommandBuffer commandBuffer, std::vector<TinyImage*> syncImages = {}, std::vector<TinyBuffer*> syncBuffers = {}, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }, const VkClearValue depthStencil = { .depthStencil = { 1.0f, 0 } }) {
-				VkResult result = vkCmdEndRenderingEKHR(renderContext.vkdevice.instance, commandBuffer);
+				VkResult result = vkCmdEndRenderingEKHR(renderContext->vkdevice.instance, commandBuffer);
 				if (result != VK_SUCCESS) return result;
 
 				renderTarget->TransitionLayoutBarrier(commandBuffer, TinyCmdBufferSubmitStage::STAGE_END, (renderTarget->imageType == TinyImageType::TYPE_SWAPCHAIN)? TinyImageLayout::LAYOUT_PRESENT_SRC : TinyImageLayout::LAYOUT_COLOR_ATTACHMENT);
-				if (renderContext.graphicsPipeline.enableDepthTesting)
+				if (renderContext->graphicsPipeline.enableDepthTesting)
                     optionalDepthImage->TransitionLayoutBarrier(commandBuffer, TinyCmdBufferSubmitStage::STAGE_END, TinyImageLayout::LAYOUT_DEPTHSTENCIL_ATTACHMENT);
 
 				return vkEndCommandBuffer(commandBuffer);
@@ -130,15 +133,15 @@
 				if (renderTarget == VK_NULL_HANDLE) return VK_ERROR_INITIALIZATION_FAILED;
 				
 				if (waitFences) {
-					vkWaitForFences(renderContext.vkdevice.logicalDevice, 1, &renderTarget->imageWaitable, VK_TRUE, UINT64_MAX);
-					vkResetFences(renderContext.vkdevice.logicalDevice, 1, &renderTarget->imageWaitable);
+					vkWaitForFences(renderContext->vkdevice.logicalDevice, 1, &renderTarget->imageWaitable, VK_TRUE, UINT64_MAX);
+					vkResetFences(renderContext->vkdevice.logicalDevice, 1, &renderTarget->imageWaitable);
 				}
 				
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-				if (renderContext.graphicsPipeline.enableDepthTesting)
+				if (renderContext->graphicsPipeline.enableDepthTesting)
                     if (optionalDepthImage->width != renderTarget->width || optionalDepthImage->height != renderTarget->height) {
 						optionalDepthImage->Disposable(false);
-						optionalDepthImage->ReCreateImage(optionalDepthImage->imageType, renderTarget->width, renderTarget->height, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
+						optionalDepthImage->ReCreateImage(optionalDepthImage->imageType, renderTarget->width, renderTarget->height, renderContext->graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false);
 					}
 				
 				commandPool->ReturnAllBuffers();
@@ -168,9 +171,9 @@
 					submitInfo.pWaitSemaphores = waitSemaphores;
 					submitInfo.signalSemaphoreCount = 1;
 					submitInfo.pSignalSemaphores = signalSemaphores;
-					result = vkQueueSubmit(renderContext.graphicsPipeline.presentQueue, 1, &submitInfo, renderTarget->imageWaitable);
+					result = vkQueueSubmit(renderContext->graphicsPipeline.presentQueue, 1, &submitInfo, renderTarget->imageWaitable);
 				} else {
-					result = vkQueueSubmit(renderContext.graphicsPipeline.graphicsQueue, 1, &submitInfo, renderTarget->imageWaitable);
+					result = vkQueueSubmit(renderContext->graphicsPipeline.graphicsQueue, 1, &submitInfo, renderTarget->imageWaitable);
 				}
 
 				return result;
@@ -186,12 +189,15 @@
 
 			/// @brief Initialize this Graphics Renderer with its target settings.
 			VkResult Initialize() {
-				return SetRenderTarget(commandPool, renderTarget, optionalDepthImage, false);
+				return VK_SUCCESS;
+				// Do not need to call, see constructor.
+				// Allows setting the render-target to NULL on TinySwapchain creation (renderer extended class).
+				//return SetRenderTarget(renderContext, commandPool, renderTarget, optionalDepthImage, false);
 			}
 
 			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyObject<TinyRenderer> Construct(TinyRenderContext& renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE) {
+			inline static TinyObject<TinyRenderer> Construct(TinyRenderContext* renderContext, TinyCommandPool* cmdPool, TinyImage* renderTarget, TinyImage* optionalDepthImage = VK_NULL_HANDLE) {
 				std::unique_ptr<TinyRenderer> object =
 					std::make_unique<TinyRenderer>(renderContext, cmdPool, renderTarget, optionalDepthImage);
 				return TinyObject<TinyRenderer>(object, object->Initialize());

@@ -42,9 +42,9 @@
 
 			/// @brief Manually calls dispose on resources without deleting the object.
 			void Disposable(bool waitIdle) {
-				if (waitIdle) renderContext.vkdevice.DeviceWaitIdle();
+				if (waitIdle) renderContext->vkdevice.DeviceWaitIdle();
 
-				if (renderContext.graphicsPipeline.enableDepthTesting) {
+				if (renderContext->graphicsPipeline.enableDepthTesting) {
 					for(TinyImage* depthImage : imageDepthSources) {
 						depthImage->Dispose();
 						delete depthImage;
@@ -57,24 +57,24 @@
 				}
 				
 				for(VkSemaphore available : imageAvailable)
-					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, available, VK_NULL_HANDLE);
+					vkDestroySemaphore(renderContext->vkdevice.logicalDevice, available, VK_NULL_HANDLE);
 
 				for(VkSemaphore finished : imageFinished)
-					vkDestroySemaphore(renderContext.vkdevice.logicalDevice, finished, VK_NULL_HANDLE);
+					vkDestroySemaphore(renderContext->vkdevice.logicalDevice, finished, VK_NULL_HANDLE);
 				
 				for(VkFence inflight : imageInFlight)
-					vkDestroyFence(renderContext.vkdevice.logicalDevice, inflight, VK_NULL_HANDLE);
+					vkDestroyFence(renderContext->vkdevice.logicalDevice, inflight, VK_NULL_HANDLE);
 
 				for(auto swapImage : imageSources) {
-					vkDestroyImageView(renderContext.vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
+					vkDestroyImageView(renderContext->vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
 					delete swapImage;
 				}
 
-				vkDestroySwapchainKHR(renderContext.vkdevice.logicalDevice, swapChain, VK_NULL_HANDLE);
+				vkDestroySwapchainKHR(renderContext->vkdevice.logicalDevice, swapChain, VK_NULL_HANDLE);
 			}
 
 			/// @brief Creates a renderer specifically for performing render commands on a TinySwapChain (VkSwapChain) to present to the window.
-			TinySwapchain(TinyRenderContext& renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+			TinySwapchain(TinyRenderContext* renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
 				: window(window), bufferingMode(bufferingMode), cmdPoolBufferCount(cmdpoolbuffercount), presentDetails(presentDetails), imageUsage(imageUsage), presentable(true), TinyRenderer(renderContext, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				onResizeFrameBuffer.hook(TinyCallback<int, int>([this](int, int){ this->RenderSwapChain(); }));
@@ -84,7 +84,7 @@
 
 			/// @brief Create the Vulkan surface swap-chain images and imageviews.
 			VkResult CreateSwapChainImages(uint32_t width = 0, uint32_t height = 0) {
-				TinySwapChainSupporter swapChainSupport = QuerySwapChainSupport(renderContext.vkdevice.physicalDevice);
+				TinySwapChainSupporter swapChainSupport = QuerySwapChainSupport(renderContext->vkdevice.physicalDevice);
 				VkSurfaceFormatKHR surfaceFormat = QuerySwapSurfaceFormat(swapChainSupport.formats);
 				VkPresentModeKHR presentMode = QuerySwapPresentMode(swapChainSupport.presentModes);
 				VkExtent2D extent = QuerySwapExtent(swapChainSupport.capabilities);
@@ -95,8 +95,6 @@
 						std::min(std::max((uint32_t)width, swapChainSupport.capabilities.minImageExtent.width), swapChainSupport.capabilities.maxImageExtent.width),
 						std::min(std::max((uint32_t)height, swapChainSupport.capabilities.minImageExtent.height), swapChainSupport.capabilities.maxImageExtent.height)
 					};
-				} else {
-					extent = QuerySwapExtent(swapChainSupport.capabilities);
 				}
 
 				if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
@@ -104,7 +102,7 @@
 
 				VkSwapchainCreateInfoKHR createInfo{};
 				createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-				createInfo.surface = renderContext.vkdevice.presentSurface;
+				createInfo.surface = renderContext->vkdevice.presentSurface;
 				createInfo.minImageCount = imageCount;
 				createInfo.imageFormat = surfaceFormat.format;
 				createInfo.imageColorSpace = surfaceFormat.colorSpace;
@@ -112,7 +110,7 @@
 				createInfo.imageArrayLayers = 1; // Change when developing VR or other 3D stereoscopic applications
 				createInfo.imageUsage = imageUsage;
 
-				TinyQueueFamily indices = renderContext.vkdevice.QueryPhysicalDeviceQueueFamilies();
+				TinyQueueFamily indices = renderContext->vkdevice.QueryPhysicalDeviceQueueFamilies();
 				if (!indices.hasGraphicsFamily || !indices.hasPresentFamily)
 					return VK_ERROR_INITIALIZATION_FAILED;
 
@@ -134,18 +132,18 @@
 				createInfo.clipped = VK_TRUE;
 				createInfo.oldSwapchain = swapChain;
 
-				if (vkCreateSwapchainKHR(renderContext.vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &swapChain) != VK_SUCCESS)
+				if (vkCreateSwapchainKHR(renderContext->vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &swapChain) != VK_SUCCESS)
 					return VK_ERROR_INITIALIZATION_FAILED;
 
-				vkGetSwapchainImagesKHR(renderContext.vkdevice.logicalDevice, swapChain, &imageCount, VK_NULL_HANDLE);
+				vkGetSwapchainImagesKHR(renderContext->vkdevice.logicalDevice, swapChain, &imageCount, VK_NULL_HANDLE);
 				
 				std::vector<VkImage> newSwapImages;
 				newSwapImages.resize(imageCount);
-				vkGetSwapchainImagesKHR(renderContext.vkdevice.logicalDevice, swapChain, &imageCount, newSwapImages.data());
+				vkGetSwapchainImagesKHR(renderContext->vkdevice.logicalDevice, swapChain, &imageCount, newSwapImages.data());
 
 				imageSources.resize(imageCount);
 				for(uint32_t i = 0; i < imageCount; i++)
-					imageSources[i] = new TinyImage(renderContext, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, VK_FORMAT_B8G8R8A8_UNORM , VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+					imageSources[i] = new TinyImage(*renderContext, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, VK_FORMAT_B8G8R8A8_UNORM , VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
 
 				imageFormat = surfaceFormat.format;
 				imageExtent = extent;
@@ -175,7 +173,7 @@
 						createInfo.subresourceRange.layerCount = 1;
 					} else { createInfo = *createInfoEx; }
 
-					vkCreateImageView(renderContext.vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &imageSources[i]->imageView);
+					vkCreateImageView(renderContext->vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &imageSources[i]->imageView);
 				}
 			}
 
@@ -201,11 +199,11 @@
 				fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
 				for (size_t i = 0; i < imageSources.size(); i++) {
-					VkResult result = vkCreateSemaphore(renderContext.vkdevice.logicalDevice, &semaphoreInfo, VK_NULL_HANDLE, &imageAvailable[i]);
+					VkResult result = vkCreateSemaphore(renderContext->vkdevice.logicalDevice, &semaphoreInfo, VK_NULL_HANDLE, &imageAvailable[i]);
 					if (result != VK_SUCCESS) return result;
-					result = vkCreateSemaphore(renderContext.vkdevice.logicalDevice, &semaphoreInfo, VK_NULL_HANDLE, &imageFinished[i]);
+					result = vkCreateSemaphore(renderContext->vkdevice.logicalDevice, &semaphoreInfo, VK_NULL_HANDLE, &imageFinished[i]);
 					if (result != VK_SUCCESS) return result;
-					result = vkCreateFence(renderContext.vkdevice.logicalDevice, &fenceInfo, VK_NULL_HANDLE, &imageInFlight[i]);
+					result = vkCreateFence(renderContext->vkdevice.logicalDevice, &fenceInfo, VK_NULL_HANDLE, &imageInFlight[i]);
 					if (result != VK_SUCCESS) return result;
 					
 					imageSources[i]->imageAvailable = imageAvailable[i];
@@ -221,7 +219,7 @@
 				TinySwapChainSupporter details;
 
 				uint32_t formatCount;
-				VkSurfaceKHR windowSurface = renderContext.vkdevice.presentSurface;
+				VkSurfaceKHR windowSurface = renderContext->vkdevice.presentSurface;
 				vkGetPhysicalDeviceSurfaceFormatsKHR(device, windowSurface, &formatCount, VK_NULL_HANDLE);
 				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, windowSurface, &details.capabilities);
 
@@ -276,9 +274,9 @@
 
 			/// @brief Acquires the next image from the swap chain and returns out that image index.
 			VkResult QueryNextImage() {
-				vkWaitForFences(renderContext.vkdevice.logicalDevice, 1, &imageInFlight[currentSyncFrame], VK_TRUE, UINT64_MAX);
-				vkResetFences(renderContext.vkdevice.logicalDevice, 1, &imageInFlight[currentSyncFrame]);
-				return vkAcquireNextImageKHR(renderContext.vkdevice.logicalDevice, swapChain, UINT64_MAX, imageAvailable[currentSyncFrame], VK_NULL_HANDLE, &currentSwapFrame);
+				vkWaitForFences(renderContext->vkdevice.logicalDevice, 1, &imageInFlight[currentSyncFrame], VK_TRUE, UINT64_MAX);
+				vkResetFences(renderContext->vkdevice.logicalDevice, 1, &imageInFlight[currentSyncFrame]);
+				return vkAcquireNextImageKHR(renderContext->vkdevice.logicalDevice, swapChain, UINT64_MAX, imageAvailable[currentSyncFrame], VK_NULL_HANDLE, &currentSwapFrame);
 			}
 
 			/// @brief Present the render results to the screen.
@@ -296,7 +294,7 @@
 				presentInfo.pImageIndices = &currentSwapFrame;
 
 				currentSyncFrame = (currentSyncFrame + 1) % static_cast<size_t>(imageSources.size());
-				return vkQueuePresentKHR(renderContext.graphicsPipeline.presentQueue, &presentInfo);
+				return vkQueuePresentKHR(renderContext->graphicsPipeline.presentQueue, &presentInfo);
 			}
 			
 			/// @brief Render the swapchain commands.
@@ -305,18 +303,20 @@
 				if (!presentable) return VK_ERROR_OUT_OF_DATE_KHR;
 				
 				VkResult result = QueryNextImage();
-				TinyImage* swapDepthImage = (renderContext.graphicsPipeline.enableDepthTesting)? imageDepthSources[currentSyncFrame]: VK_NULL_HANDLE;
+				TinyImage* swapDepthImage = (renderContext->graphicsPipeline.enableDepthTesting)? imageDepthSources[currentSyncFrame]: VK_NULL_HANDLE;
 				
 				imageSources[currentSwapFrame]->imageAvailable = imageAvailable[currentSyncFrame];
 				imageSources[currentSwapFrame]->imageFinished = imageFinished[currentSyncFrame];
 				imageSources[currentSwapFrame]->imageWaitable = imageInFlight[currentSyncFrame];
 				
-				this->SetRenderTarget(imageCmdPools[currentSyncFrame], imageSources[currentSwapFrame], swapDepthImage, false);
-
 				if (result == VK_SUCCESS) {
-					result = this->TinyRenderer::RenderExecute(false);
-					if (result == VK_SUCCESS)
-						result = this->RenderPresent();
+					result = this->SetRenderTarget(renderContext, imageCmdPools[currentSyncFrame], imageSources[currentSwapFrame], swapDepthImage, false);
+					
+					if (result == VK_SUCCESS) {
+						result = this->TinyRenderer::RenderExecute(false);
+						if (result == VK_SUCCESS)
+							result = this->RenderPresent();
+					}
 				}
 				
 				if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -334,17 +334,17 @@
 				if (hwndWindow != window.hwndWindow) return;
 
 				if (width > 0 && height > 0) {
-					renderContext.vkdevice.DeviceWaitIdle();
+					renderContext->vkdevice.DeviceWaitIdle();
 
 					for(auto swapImage : imageSources) {
-						vkDestroyImageView(renderContext.vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
+						vkDestroyImageView(renderContext->vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
 						delete swapImage;
 					}
 					imageSources.resize(0);
 
 					VkSwapchainKHR oldSwapChain = swapChain;
 					CreateSwapChain(width, height);
-					vkDestroySwapchainKHR(renderContext.vkdevice.logicalDevice, oldSwapChain, VK_NULL_HANDLE);
+					vkDestroySwapchainKHR(renderContext->vkdevice.logicalDevice, oldSwapChain, VK_NULL_HANDLE);
 
 					presentable = true;
 					refreshable = false;
@@ -362,12 +362,6 @@
 
 			/// @brief Returns the current resource synchronized frame index.
 			uint32_t GetSyncronizedFrameIndex() { return currentSyncFrame; }
-			
-			/// @brief Returns reference to presentable atomic_bool (whether swapchain is presentable or not).
-			std::atomic_bool& GetPresentableBool() { return presentable; }
-			
-			/// @brief Returns reference to presentable atomic_bool (whether swapchain is NOT presentable and needs a refresh).
-			std::atomic_bool& GetRefreshableBool() { return refreshable; }
 
 			/// @brief Returns the current resource synchronized frame index.
 			void PushPresentMode(VkPresentModeKHR presentMode) {
@@ -388,14 +382,14 @@
 			/// @brief Initializes this swapchain renderer.
 			VkResult Initialize() {
 				for(size_t i = 0; i < static_cast<size_t>(bufferingMode); i++) {
-					TinyCommandPool* cmdpool = new TinyCommandPool(renderContext.vkdevice, false, cmdPoolBufferCount);
+					TinyCommandPool* cmdpool = new TinyCommandPool(renderContext->vkdevice, false, cmdPoolBufferCount);
 					cmdpool->Initialize();
 					imageCmdPools.push_back(cmdpool);
 				}
 				
-				if (renderContext.graphicsPipeline.enableDepthTesting)
+				if (renderContext->graphicsPipeline.enableDepthTesting)
 					for(size_t i = 0; i < static_cast<size_t>(bufferingMode); i++) {
-						TinyImage* depthImage = new TinyImage(renderContext, TinyImageType::TYPE_DEPTHSTENCIL, imageExtent.width, imageExtent.height, renderContext.graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_REPEAT, false, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
+						TinyImage* depthImage = new TinyImage(*renderContext, TinyImageType::TYPE_DEPTHSTENCIL, imageExtent.width, imageExtent.height, renderContext->graphicsPipeline.QueryDepthFormat(), VK_SAMPLER_ADDRESS_MODE_REPEAT, false, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
 						depthImage->Initialize();
 						imageDepthSources.push_back(depthImage);
 					}
@@ -408,7 +402,7 @@
 			
 			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
 			template<typename... A>
-			inline static TinyObject<TinySwapchain> Construct(TinyRenderContext& renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
+			inline static TinyObject<TinySwapchain> Construct(TinyRenderContext* renderContext, TinyWindow& window, const TinyBufferingMode bufferingMode, size_t cmdpoolbuffercount = TinyCommandPool::defaultCommandPoolSize, TinySurfaceSupporter presentDetails = TinySurfaceSupporter(), VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) {
 				std::unique_ptr<TinySwapchain> object =
 					std::make_unique<TinySwapchain>(renderContext, window, bufferingMode, cmdpoolbuffercount, presentDetails, imageUsage);
 				return TinyObject<TinySwapchain>(object, object->Initialize());
