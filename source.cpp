@@ -94,7 +94,7 @@ int TINY_ENGINE_WINDOWMAIN {
     float current_time, previous_time;
     int angle = 0;
     swapchain.ref().onRenderEvents.hook(TinyCallback<TinyCommandPool&>(
-        [&current_time, &previous_time, &angle, &texture, &triangles, &indices, &vkdevice, &window, &swapchain, &pipeline, &queue, &vbuffer, &ibuffer, &clearColor](TinyCommandPool& commandPool) {
+        [&](TinyCommandPool& commandPool) {
         auto frame = queue.GetFrameResource();
 
         auto commandBuffer = commandPool.LeaseBuffer();
