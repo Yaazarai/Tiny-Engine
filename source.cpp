@@ -57,8 +57,8 @@ int TINY_ENGINE_WINDOWMAIN {
 
     VkClearValue clearColor{ .color.float32 = { 0.0, 0.0, 0.0, 1.0 } };
 
-    renderpass[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&>(
-        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer, &ibuffer, /*&projection,*/ &clearColor](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers) {
+    renderpass[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
+        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer, &ibuffer, /*&projection,*/ &clearColor](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
         auto commandBuffer = commandPool.LeaseBuffer();
         
         renderpass.BeginRecordCmdBuffer(commandBuffer.first, clearColor);        
@@ -66,6 +66,9 @@ int TINY_ENGINE_WINDOWMAIN {
             //VkWriteDescriptorSet cameraDescriptor = projection.ref().GetWriteDescriptor(0, 1, { &cameraDescriptorInfo });
             //renderpass.PushDescriptorSet(commandBuffer.first, { cameraDescriptor });
             
+            if (frameResized) 
+                camera = TinyMath::Project2D(window.ref().hwndWidth, window.ref().hwndHeight, 0, 0, 1.0, 0.0);
+
             renderpass.PushConstants(commandBuffer.first, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4), &camera);
             TinyRenderCmds::CmdBindGeometry(commandBuffer.first, &vbuffer.ref().buffer, ibuffer.ref().buffer);
             TinyRenderCmds::CmdDrawGeometry(commandBuffer.first, true, 1, indices.size());
@@ -73,11 +76,11 @@ int TINY_ENGINE_WINDOWMAIN {
         writeCmdBuffers.push_back(commandBuffer.first);
     }));
 
-    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&>(
-        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer2, &ibuffer, /*&projection,*/ &clearColor](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers) {
+    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
+        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer2, &ibuffer, /*&projection,*/ &clearColor](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
         auto commandBuffer = commandPool.LeaseBuffer();
         
-        renderpass.BeginRecordCmdBuffer(commandBuffer.first, clearColor);        
+        renderpass.BeginRecordCmdBuffer(commandBuffer.first, clearColor);
             //VkDescriptorBufferInfo cameraDescriptorInfo = projection.ref().GetDescriptorInfo();
             //VkWriteDescriptorSet cameraDescriptor = projection.ref().GetWriteDescriptor(0, 1, { &cameraDescriptorInfo });
             //renderpass.PushDescriptorSet(commandBuffer.first, { cameraDescriptor });

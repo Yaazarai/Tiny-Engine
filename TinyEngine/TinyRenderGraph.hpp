@@ -13,7 +13,7 @@
 			const VkBool32 pushToPresent;
 			const VkDeviceSize subpassIndex;
 			std::vector<TinyRenderPass*> dependencies;
-			TinyInvokable<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&> onRender;
+			TinyInvokable<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool> onRender;
 			VkSemaphore renderPassFinished;
 			VkFence renderPassSignal;
 			VkDeviceSize timelineWait;
@@ -58,9 +58,7 @@
 			}
 			
 			VkResult BeginRecordCmdBuffer(VkCommandBuffer targetCmdBuffer, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }, const VkClearValue depthStencil = { .depthStencil = { 1.0f, 0 } }) {
-				VkCommandBufferBeginInfo beginInfo {};
-				beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-				beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+				VkCommandBufferBeginInfo beginInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT };
 
 				VkResult result = vkBeginCommandBuffer(targetCmdBuffer, &beginInfo);
 				if (result != VK_SUCCESS) return result;
@@ -88,13 +86,11 @@
 			VkResult EndRecordCmdBuffer(VkCommandBuffer targetCmdBuffer, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }, const VkClearValue depthStencil = { .depthStencil = { 1.0f, 0 } }) {
 				VkResult result = vkCmdEndRenderingEKHR(pipeline.vkdevice.instance, targetCmdBuffer);
 				if (result != VK_SUCCESS) return result;
-                
-                if (targetImage->imageType == TinyImageType::TYPE_SWAPCHAIN) {
-					targetImage->TransitionLayoutBarrier(targetCmdBuffer, TinyCmdBufferSubmitStage::STAGE_END, TinyImageLayout::LAYOUT_PRESENT_SRC);
-				} else {
-					targetImage->TransitionLayoutBarrier(targetCmdBuffer, TinyCmdBufferSubmitStage::STAGE_END, TinyImageLayout::LAYOUT_SHADER_READONLY);
-				}
 
+				targetImage->TransitionLayoutBarrier(targetCmdBuffer, TinyCmdBufferSubmitStage::STAGE_END,
+					(targetImage->imageType == TinyImageType::TYPE_SWAPCHAIN)?
+						TinyImageLayout::LAYOUT_PRESENT_SRC : TinyImageLayout::LAYOUT_SHADER_READONLY);
+				
 				return vkEndCommandBuffer(targetCmdBuffer);
 			}
 			
@@ -111,23 +107,20 @@
 			TinyVkDevice& vkdevice;
 			TinyWindow* window;
 
-			std::atomic_int64_t frameCounter, renderPassCounter;
 			VkFence swapImageInFlight;
-			VkSemaphore swapImageAvailable;
-			VkSemaphore swapImageFinished;
-			VkSemaphore swapImageTimeline;
+			VkSemaphore swapImageAvailable, swapImageFinished, swapImageTimeline;
             
 			std::timed_mutex swapChainMutex;
-			VkSwapchainKHR swapChain;
 			TinySurfaceSupporter swapChainPresentDetails;
 			VkQueue swapChainPresentQueue;
-			
+			VkSwapchainKHR swapChain;
 			std::vector<TinyImage*> swapChainImages;
-			std::atomic_bool presentable, refreshable;
+
+			std::atomic_int64_t frameCounter, renderPassCounter;
+			std::atomic_bool presentable, refreshable, frameResized;
 			uint32_t swapFrameIndex;
 
 			std::vector<TinyRenderPass*> renderPasses;
-			inline static TinyInvokable<> onResizeFrameBuffer;
 
 			TinyRenderGraph operator=(const TinyRenderGraph&) = delete;
 			TinyRenderGraph(const TinyRenderGraph&) = delete;
@@ -150,7 +143,7 @@
 				vkDestroySemaphore(vkdevice.logicalDevice, swapImageTimeline, VK_NULL_HANDLE);
 			}
 
-			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window) : vkdevice(vkdevice), window(window), presentable(true), refreshable(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
+			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window) : vkdevice(vkdevice), window(window), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 			}
 			
@@ -182,6 +175,7 @@
 
 				presentable = true;
 				refreshable = false;
+				frameResized = true;
 			}
 			
 			VkResult ExecuteRenderGraph() {
@@ -194,7 +188,7 @@
 						renderPasses[i]->targetImage = swapChainImages[swapFrameIndex];
 					
 					std::vector<VkCommandBuffer> cmdbuffers;
-					renderPasses[i]->onRender.invoke(*renderPasses[i], renderPasses[i]->cmdPool, cmdbuffers);
+					renderPasses[i]->onRender.invoke(*renderPasses[i], renderPasses[i]->cmdPool, cmdbuffers, static_cast<bool>(frameResized));
 
 					VkSubmitInfo submitInfo{ .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .commandBufferCount = static_cast<uint32_t>(cmdbuffers.size()), .pCommandBuffers = cmdbuffers.data() };
 					VkTimelineSemaphoreSubmitInfo timelineInfo = { .sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO, .waitSemaphoreValueCount = 0, .pWaitSemaphoreValues = VK_NULL_HANDLE, .pNext = VK_NULL_HANDLE };
@@ -206,9 +200,11 @@
 					VkSemaphore dependencyWaits[] { swapImageTimeline };
 					
 					VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-					submitInfo.waitSemaphoreCount = 1;
 					submitInfo.pWaitDstStageMask = waitStages;
-					submitInfo.pWaitSemaphores = (i == 0 || renderPasses[i]->dependencies.size() == 0)? initialWaits : dependencyWaits;
+					
+					bool isInitialPass = i == 0 || renderPasses[i]->dependencies.size() == 0;
+					submitInfo.waitSemaphoreCount = static_cast<uint32_t>(isInitialPass);
+					submitInfo.pWaitSemaphores = (isInitialPass)? initialWaits : dependencyWaits;
 					
 					timelineInfo.waitSemaphoreValueCount = 1;
 					timelineInfo.pWaitSemaphoreValues = &waitValue;
@@ -239,12 +235,11 @@
 					VkResult result = TinySwapchain::QueryNextSwapChainImage(vkdevice, swapChain, swapFrameIndex, swapImageInFlight, swapImageAvailable);
 					TinySwapchain::WaitResetFences(vkdevice, &swapImageInFlight);
 
-					if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
-						ExecuteRenderGraph();
-						result = TinySwapchain::QueuePresent(swapChainPresentQueue, swapChain, swapImageFinished, swapFrameIndex);
-					}
+					if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) result = ExecuteRenderGraph();
+					if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) result = TinySwapchain::QueuePresent(swapChainPresentQueue, swapChain, swapImageFinished, swapFrameIndex);
 
 					presentable = (result == VK_SUCCESS);
+					frameResized = false;
 					frameCounter ++;
 				}
 				return result;
