@@ -9,9 +9,7 @@
 			/// @brief Vertex (Point) stage pre-rasterization.
 			STAGE_VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
 			/// @brief Fragment (Pixel) stage post-rasterization.
-			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
-			/// @brief Compute (Dispatch) stage non-rendering.
-			STAGE_COMPUTE = VK_SHADER_STAGE_COMPUTE_BIT
+			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT
 		};
 		
 		/// Specifies tghe object type we're sending to our shader: image, buffer, etc.
@@ -50,14 +48,14 @@
 			LAYOUT_TRANSFER_DST = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			/// @brief Read-Only layout for shader samplers.
 			LAYOUT_SHADER_READONLY = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			/// @brief Depth-Write by rasterizer to get depth drawing info.
-			LAYOUT_DEPTHSTENCIL_ATTACHMENT = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 			/// @brief Unknown layout, e.g. source layout was unspecified.
 			LAYOUT_UNDEFINED = VK_IMAGE_LAYOUT_UNDEFINED,
 			/// @brief Read-Only layout for shader samplers.
 			LAYOUT_COLOR_ATTACHMENT = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			/// @brief Storage-Image layolut for read/write in compute shaders.
+			/// @brief Generic layout for read OR write in shaders.
 			LAYOUT_GENERAL = VK_IMAGE_LAYOUT_GENERAL,
+			/// @brief Generic layout for read OR write in shaders.
+			LAYOUT_STORAGE = VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT,
 			/// @brief Presentation layout for displaying on screen.
 			LAYOUT_PRESENT_SRC = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		};
@@ -68,16 +66,16 @@
 			TYPE_SWAPCHAIN,
 			/// @brief For writing to VkImage via Fragment shaders.
 			TYPE_COLORATTACHMENT,
-			/// @brief For reading/writing directly from/to VkImage via Compute shaders.
+			/// @brief For reading/writing directly from/to VkImage via shaders.
 			TYPE_STORAGE,
-			/// @brief For reading/writing depth/stencil shader information.
-			TYPE_DEPTHSTENCIL,
 			/// @brief For reading within shaders only.
 			TYPE_SHADER_READONLY
 		};
 
 		/// @brief Window/Present Buffering Frequency.
 		enum class TinyBufferingMode {
+			/// @brief Single-Buffering (typical).
+			MODE_SINGLE = 1,
 			/// @brief Double-Buffering (typical).
 			MODE_DOUBLE = 2,
 			/// @brief Triple-Buffering (excessive).
@@ -96,6 +94,10 @@
 			STAGE_BEGIN_TO_END
 		};
 		
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+		/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 		/// @brief GLFW Should Close Poll or Wait Events.
 		enum class TinyWindowEvents {
 			POLL_EVENTS,

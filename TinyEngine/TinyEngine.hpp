@@ -125,16 +125,14 @@
     #pragma region VULKAN_INITIALIZATION
         #include "./TinyVulkanDevice.hpp"
         #include "./TinyCommandPool.hpp"
-        #include "./TinyGraphicsPipeline.hpp"
+        #include "./TinyPipeline.hpp"
     #pragma endregion
     #pragma region TINY_RENDERING
-        #include "./TinyRenderContext.hpp"
         #include "./TinyBuffer.hpp"
         #include "./TinyImage.hpp"
-        #include "./TinyRenderer.hpp"
         #include "./TinySwapchain.hpp"
-        #include "./TinyCompute.hpp"
-        #include "./TinyResourceQueue.hpp"
+        #include "./TinyRenderCmd.hpp"
+        #include "./TinyRenderGraph.hpp"
         #include "./TinyMath.hpp"
     #pragma endregion
 #endif

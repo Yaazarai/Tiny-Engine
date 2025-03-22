@@ -137,7 +137,7 @@
 			VkPresentModeKHR idealPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 		};
 
-		class TinyRenderInterface {
+		class TinyRenderCmds {
 		public:
 			/// @brief Alias call for easy-calls to: vkCmdBindVertexBuffers + vkCmdBindIndexBuffer.
 			inline static void CmdBindGeometry(VkCommandBuffer cmdBuffer, const VkBuffer* vertexBuffers, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
@@ -171,5 +171,101 @@
 		};
 
         #pragma endregion
+		#pragma region VULKAN_DEFAULT_PIPELINE_STATES
+
+		const VkPipelineVertexInputStateCreateInfo defaultVertexInputInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+			.pVertexBindingDescriptions = VK_NULL_HANDLE,
+			.vertexBindingDescriptionCount = 0,
+			.pVertexAttributeDescriptions = VK_NULL_HANDLE,
+			.vertexAttributeDescriptionCount = 0
+		};
+		
+		const VkPipelineInputAssemblyStateCreateInfo defaultInputAssembly {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+			.topology = {},
+			.primitiveRestartEnable = VK_FALSE
+		};
+
+		const VkPipelineViewportStateCreateInfo defaultViewportState {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+			.viewportCount = 1,
+			.scissorCount = 1,
+			.flags = 0
+		};
+
+		const VkPipelineRasterizationStateCreateInfo defaultRasterizer {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+			.depthBiasEnable = VK_FALSE,
+			.depthClampEnable = VK_FALSE,
+			.rasterizerDiscardEnable = VK_FALSE,
+			.polygonMode = {},
+			.lineWidth = 1.0f,
+			.cullMode = VK_CULL_MODE_BACK_BIT,
+			.frontFace = VK_FRONT_FACE_CLOCKWISE
+		};
+		
+		const VkPipelineMultisampleStateCreateInfo defaultMultisampling {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+			.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+			.sampleShadingEnable = VK_FALSE
+		};
+		
+		const VkPipelineColorBlendAttachmentState defaultColorBlendState = {
+			.blendEnable = VK_TRUE,
+			.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
+		};
+
+		const VkPipelineColorBlendStateCreateInfo defaultColorBlending {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+			.logicOpEnable = VK_FALSE,
+			.logicOp = VK_LOGIC_OP_COPY,
+			.attachmentCount = 1,
+			.pAttachments = VK_NULL_HANDLE,
+			.blendConstants[0] = 0.0f,
+			.blendConstants[1] = 0.0f,
+			.blendConstants[2] = 0.0f,
+			.blendConstants[3] = 0.0f
+		};
+		
+		const std::array<VkDynamicState, 2> defaultDynamicStateEnables = {
+			VK_DYNAMIC_STATE_VIEWPORT,
+			VK_DYNAMIC_STATE_SCISSOR
+		};
+
+		const VkPipelineDynamicStateCreateInfo defaultDynamicState {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+			.pDynamicStates = defaultDynamicStateEnables.data(),
+			.dynamicStateCount = static_cast<uint32_t>(defaultDynamicStateEnables.size()),
+			.flags = 0,
+			.pNext = VK_NULL_HANDLE
+		};
+		
+		const VkPipelineRenderingCreateInfoKHR defaultRenderingCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+			.pColorAttachmentFormats = VK_NULL_HANDLE,
+			.depthAttachmentFormat = {},
+			.colorAttachmentCount = 1
+		};
+
+		const VkPipelineDepthStencilStateCreateInfo defaultDepthStencilInfo {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			.depthTestEnable = VK_FALSE,
+			.depthWriteEnable = VK_FALSE,
+			.depthCompareOp = VK_COMPARE_OP_LESS,
+			.depthBoundsTestEnable = VK_FALSE,
+			.minDepthBounds = 0.0f,
+			.maxDepthBounds = 1.0f,
+			.stencilTestEnable = VK_FALSE,
+			.front = {}, .back = {}
+		};
+
+		#pragma endregion
 	}
 #endif

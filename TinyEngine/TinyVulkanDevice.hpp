@@ -21,7 +21,14 @@
 		class TinyVkDevice : public TinyDisposable {
 		public:
 			std::vector<const char*> validationLayers = { VK_VALIDATION_LAYER_KHRONOS_EXTENSION_NAME };
-			std::vector<const char*> deviceExtensions = { VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME };
+			std::vector<const char*> deviceExtensions = {
+				VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+				VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+				VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+				VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
+				/*VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME,*/
+				VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
+			};
 			std::vector<const char*> instanceExtensions = {  };
 
 			const std::vector<VkPhysicalDeviceType> deviceTypes;
@@ -64,7 +71,6 @@
 			TinyVkDevice(bool useGraphicsBit = true, bool useComputeBit = false, bool usePresentBit = false, TinyWindow* window = VK_NULL_HANDLE, const std::vector<VkPhysicalDeviceType> deviceTypes = { VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU }, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE })
 			: window(window), deviceTypes(deviceTypes), useComputeBit(useComputeBit), useGraphicsBit(useGraphicsBit), usePresentBit(usePresentBit), deviceFeatures(deviceFeatures) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
-				std::cout << "TESTING 1 2 3..." << std::endl;
 			}
 
 			/// @brief Queries device drivers for installed Validation Layers.
@@ -102,14 +108,16 @@
 				std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
 				vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 				
-				int32_t useOutputBits = static_cast<int32_t>(useComputeBit) + static_cast<int32_t>(useGraphicsBit) + static_cast<int32_t>(usePresentBit);
+				bool useTimestampBits = true;
+				int32_t useOutputBits = static_cast<int32_t>(useTimestampBits) + static_cast<int32_t>(useComputeBit) + static_cast<int32_t>(useGraphicsBit) + static_cast<int32_t>(usePresentBit);
 				TinyQueueFamily indices = {};
 				for (int i = 0; i < queueFamilies.size(); i++) {
 					VkBool32 presentSupport = false;
 					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, presentSurface, &presentSupport);
-					if (useComputeBit && !indices.computeFamily && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) { indices.SetComputeFamily(i); useOutputBits --; }
-					if (useGraphicsBit && !indices.hasGraphicsFamily && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) { indices.SetGraphicsFamily(i); useOutputBits --; }
-					if (usePresentBit && !indices.hasPresentFamily && presentSupport) { indices.SetPresentFamily(i); useOutputBits --; }
+
+					if (useComputeBit && !indices.computeFamily && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetComputeFamily(i); useOutputBits --; }
+					if (useGraphicsBit && !indices.hasGraphicsFamily && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
+					if (usePresentBit && !indices.hasPresentFamily && presentSupport && queueFamilies[i].timestampValidBits > 0) { indices.SetPresentFamily(i); useOutputBits --; }
 					if (useOutputBits <= 0) break;
 				}
 				return indices;
@@ -167,7 +175,7 @@
 
 				VkResult result = vkCreateInstance(&createInfo, VK_NULL_HANDLE, &instance);
 				if (result != VK_SUCCESS) {
-					std::cout << "TinyEngine: Failed to create Vulkan instance! " << (VkResult) result << std::endl;
+					std::cout << "TinyEngine: Failed to create Vulkan instance! " << result << std::endl;
 					return result;
 				}
 
@@ -239,6 +247,11 @@
 				createInfo.pQueueCreateInfos = queueCreateInfos.data();
 				createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 				createInfo.pEnabledFeatures = &deviceFeatures;
+				
+				VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphoreFeatures {};
+				timelineSemaphoreFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+				timelineSemaphoreFeatures.timelineSemaphore = VK_TRUE;
+				dynamicRenderingCreateInfo.pNext = &timelineSemaphoreFeatures;
 				
 				if (indices.hasPresentFamily) deviceExtensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 				createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
