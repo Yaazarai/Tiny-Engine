@@ -5,44 +5,6 @@
 
 	namespace TINY_ENGINE_NAMESPACE {
 		#pragma region VULKAN_DEBUG_UTILITIES
-		
-		template <typename T>
-		class TinyObject {
-		public:
-			std::unique_ptr<T> source;
-			VkResult result;
-			
-			TinyObject(const TinyObject&) = delete;
-			TinyObject operator=(TinyObject&) = delete;
-			TinyObject(std::unique_ptr<T>& source, VkResult result) : source(std::move(source)), result(result) {}
-
-			operator T&() { return static_cast<T&>(*source.get()); }
-			operator T*() { return static_cast<T*>(source.get()); }
-			T& ref() { return *source.get(); }
-			T* ptr() { return source.get(); }
-		};
-		
-		class TinyRuntimeError : public std::runtime_error {
-			public:
-			VkResult result = VK_SUCCESS;
-			std::string message;
-
-			explicit TinyRuntimeError(VkResult result, std::string _Message) : result(result), message(_Message), runtime_error(_Message) {
-				#if TINY_ENGINE_VALIDATION
-					std::cout << "[runtime error = " << static_cast<int32_t>(result) << "] : " << _Message << std::endl;
-				#endif
-			}
-
-			explicit TinyRuntimeError(VkResult result, const char* _Message) : result(result), message(_Message), runtime_error(_Message) {
-				#if TINY_ENGINE_VALIDATION
-					std::cout << "[runtime error = " << static_cast<int32_t>(result) << "] : " << _Message << std::endl;
-				#endif
-			}
-
-			operator int32_t() { return static_cast<int32_t>(result); }
-
-			operator std::string() { return message; }
-		};
 
 		VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 			auto create = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -168,10 +130,84 @@
 					break;
 				}
 			}
+
+			/// @brief Alias call for easy-calls to: vkCmdBindVertexBuffers + vkCmdBindIndexBuffer.
+			inline static void CmdBindGeometry(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer* vertexBuffers, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
+				CmdBindGeometry(targetCmdBufferPair.first, vertexBuffers, indexBuffer, indexOffset, firstDescriptorBinding, descriptorBindingCount, indexType);
+			}
+
+			/// @brief Alias call for: vkCmdBindVertexBuffers.
+			inline static void CmdBindGeometryV(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer* vertexBuffers, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1) {
+				CmdBindGeometryV(targetCmdBufferPair.first, vertexBuffers, firstDescriptorBinding, descriptorBindingCount);
+			}
+
+			/// @brief Alias call for: vkCmdBindIndexBuffers.
+			inline static void CmdBindGeometryI(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
+				CmdBindGeometryI(targetCmdBufferPair.first, indexBuffer, indexOffset, indexType);
+			}
+
+			/// @brief Alias call for vkCmdDraw (isIndexed = false) and vkCmdDrawIndexed (isIndexed = true).
+			inline static void CmdDrawGeometry(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, bool indexed, uint32_t instanceCount, uint32_t vertexCount, uint32_t firstInstance = 0, uint32_t firstIndex = 0, uint32_t firstVertexIndex = 0) {
+				CmdDrawGeometry(targetCmdBufferPair.first, indexed, instanceCount, vertexCount, firstInstance, firstIndex, firstVertexIndex);
+			}
 		};
 
         #pragma endregion
+		#pragma region VULKAN_ENUMERATE_HELPER_FUNCTIONS
+
+		VkResult QueryPhysicalDevices(VkInstance instance, std::vector<VkPhysicalDevice>& devices) {
+			uint32_t deviceCount;
+			VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, VK_NULL_HANDLE);
+			devices.resize(deviceCount);
+			if (result == VK_SUCCESS)
+				result = vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+			return result;
+		}
+
+		VkResult QueryQueueFamilyProperties(VkPhysicalDevice pdevice, std::vector<VkQueueFamilyProperties>& queueFamilies) {
+			uint32_t queueFamilyCount = 0;
+			vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &queueFamilyCount, VK_NULL_HANDLE);
+			queueFamilies.resize(queueFamilyCount);
+			if (queueFamilyCount > 0) {
+				vkGetPhysicalDeviceQueueFamilyProperties(pdevice, &queueFamilyCount, queueFamilies.data());
+				return VK_SUCCESS;
+			}
+			return VK_ERROR_DEVICE_LOST;
+		}
+
+		#pragma endregion
 		#pragma region VULKAN_DEFAULT_PIPELINE_STATES
+		
+		const VkDebugUtilsMessengerCreateInfoEXT defaultDebugCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.pfnUserCallback = DebugCallback,
+			.pUserData = VK_NULL_HANDLE
+		};
+
+		const VkApplicationInfo defaultAppInfo {
+			.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+			.pApplicationName = TINY_ENGINE_NAME,
+			.applicationVersion = TINY_ENGINE_VERSION,
+			.engineVersion = TINY_ENGINE_VERSION,
+			.apiVersion = TINY_ENGINE_VERSION,
+			.pEngineName = TINY_ENGINE_NAME
+		};
+		
+		const VkPhysicalDeviceTimelineSemaphoreFeatures defaultTimelineSemaphoreFeatures {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+			.timelineSemaphore = VK_TRUE
+		};
+
+		const VkPhysicalDevicePushDescriptorPropertiesKHR defaultPushDescriptorProperties {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR
+		};
+
+		const VkPhysicalDeviceDynamicRenderingFeatures defaultDynamicRenderingCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+			.dynamicRendering = VK_TRUE,
+		};
 
 		const VkPipelineVertexInputStateCreateInfo defaultVertexInputInfo {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -265,7 +301,7 @@
 			.stencilTestEnable = VK_FALSE,
 			.front = {}, .back = {}
 		};
-
+		
 		#pragma endregion
 	}
 #endif

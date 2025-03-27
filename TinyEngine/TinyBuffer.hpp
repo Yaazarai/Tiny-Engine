@@ -11,9 +11,9 @@
 			VkBuffer buffer = VK_NULL_HANDLE;
 			VmaAllocation memory = VK_NULL_HANDLE;
 			VmaAllocationInfo description;
-
 			const TinyBufferType bufferType;
 			VkDeviceSize size;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 			
 			TinyBuffer operator=(const TinyBuffer&) = delete;
 			TinyBuffer(const TinyBuffer&) = delete;
@@ -26,6 +26,7 @@
 			TinyBuffer(TinyVkDevice& vkdevice, const TinyBufferType bufferType, VkDeviceSize dataSize)
 			: vkdevice(vkdevice), size(dataSize), bufferType(bufferType) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = Initialize();
 			}
 
 			VkResult CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VmaAllocationCreateFlags flags) {
@@ -146,13 +147,6 @@
 				}
 
                 return result;
-			}
-			
-			template<typename... A>
-			inline static TinyObject<TinyBuffer> Construct(TinyVkDevice& context, const TinyBufferType bufferType, VkDeviceSize dataSize) {
-				std::unique_ptr<TinyBuffer> object =
-					std::make_unique<TinyBuffer>(context, bufferType, dataSize);
-				return TinyObject<TinyBuffer>(object, object->Initialize());
 			}
 		};
 	}

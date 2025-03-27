@@ -19,6 +19,7 @@
 			TinyImageLayout imageLayout;
 			VkImageAspectFlags aspectFlags;
 			VkSamplerAddressMode addressMode;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 			
 			TinyImage operator=(const TinyImage&) = delete;
 			TinyImage(const TinyImage&) = delete;
@@ -35,6 +36,7 @@
             TinyImage(TinyVkDevice& vkdevice, const TinyImageType imageType, VkDeviceSize width, VkDeviceSize height, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool interpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE)
             : vkdevice(vkdevice), imageType(imageType), width(width), height(height), imageFormat(imageFormat), addressMode(addressMode), interpolation(interpolation), image(imageSource), imageView(imageViewSource), imageSampler(imageSampler) {
                 onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = Initialize();
             }
 
             VkResult CreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false) {
@@ -270,13 +272,6 @@
 					return CreateImage(imageType, width, height, imageFormat, addressMode);
 				}
             }
-            
-            template<typename... A>
-			inline static TinyObject<TinyImage> Construct(TinyVkDevice& vkdevice, TinyImageType imageType, VkDeviceSize width, VkDeviceSize height, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool interpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE) {
-				std::unique_ptr<TinyImage> object =
-					std::make_unique<TinyImage>(vkdevice, imageType, width, height, imageFormat, addressMode, interpolation, imageSource, imageViewSource, imageSampler);
-				return TinyObject<TinyImage>(object, object->Initialize());
-			}
 		};
 	}
 #endif

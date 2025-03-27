@@ -28,11 +28,11 @@
 			static void StageBufferData(TinyBuffer& destBuffer, TinyPipeline& pipeline, TinyCommandPool&  cmdpool, void* data, VkDeviceSize dataSize, VkDeviceSize srceOffset = 0, VkDeviceSize destOffset = 0) {
 				std::pair<VkCommandBuffer,int32_t> bufferIndexPair = StartCmd(cmdpool);
 
-				TinyObject<TinyBuffer> stagingBuffer = TinyBuffer::Construct(destBuffer.vkdevice, TinyBufferType::TYPE_STAGING, dataSize);
-				memcpy(stagingBuffer.ref().description.pMappedData, data, (size_t)dataSize);
+				TinyBuffer stagingBuffer(destBuffer.vkdevice, TinyBufferType::TYPE_STAGING, dataSize);
+				memcpy(stagingBuffer.description.pMappedData, data, (size_t)dataSize);
 
 				VkBufferCopy copyRegion { .srcOffset = srceOffset, .dstOffset = destOffset, .size = dataSize };
-				vkCmdCopyBuffer(bufferIndexPair.first, stagingBuffer.ref().buffer, destBuffer.buffer, 1, &copyRegion);
+				vkCmdCopyBuffer(bufferIndexPair.first, stagingBuffer.buffer, destBuffer.buffer, 1, &copyRegion);
 
 				SubmitCmd(pipeline, cmdpool, bufferIndexPair);
 			}
@@ -40,8 +40,8 @@
 			static void StageImageData(TinyImage& destImage, TinyPipeline& pipeline, TinyCommandPool& cmdpool, void* data, VkDeviceSize dataSize, VkExtent2D size = {0, 0}, VkOffset2D offset = {0, 0}) {
 				std::pair<VkCommandBuffer,int32_t> bufferIndexPair = StartCmd(cmdpool);
 
-				TinyObject<TinyBuffer> stagingBuffer = TinyBuffer::Construct(destImage.vkdevice, TinyBufferType::TYPE_STAGING, dataSize);
-				memcpy(stagingBuffer.ref().description.pMappedData, data, (size_t)dataSize);
+				TinyBuffer stagingBuffer(destImage.vkdevice, TinyBufferType::TYPE_STAGING, dataSize);
+				memcpy(stagingBuffer.description.pMappedData, data, (size_t)dataSize);
 
 				TinyImageLayout prevLayout = destImage.imageLayout;
 				destImage.TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_TRANSFER_DST);
@@ -51,7 +51,7 @@
 					.imageExtent = { static_cast<uint32_t>((size.width == 0)?destImage.width:size.width), static_cast<uint32_t>((size.height == 0)?destImage.height:size.height), 1 },
 					.imageOffset = { static_cast<int32_t>(offset.x), static_cast<int32_t>(offset.y), 0 }
 				};
-				vkCmdCopyBufferToImage(bufferIndexPair.first, stagingBuffer.ref().buffer, destImage.image, (VkImageLayout) destImage.imageLayout, 1, &region);
+				vkCmdCopyBufferToImage(bufferIndexPair.first, stagingBuffer.buffer, destImage.image, (VkImageLayout) destImage.imageLayout, 1, &region);
 				destImage.TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_END, prevLayout);
 
 				SubmitCmd(pipeline, cmdpool, bufferIndexPair);

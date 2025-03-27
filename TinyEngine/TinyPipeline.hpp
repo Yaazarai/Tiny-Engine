@@ -6,7 +6,7 @@
 		#define VKCOMP_RGBA_BITS VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
 		#define VKCOMP_BGRA_BITS VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT
 		
-		/* ✓ */ struct TinyVertexDescription {
+		struct TinyVertexDescription {
 		public:
 			const VkVertexInputBindingDescription binding;
 			const std::vector<VkVertexInputAttributeDescription> attributes;
@@ -15,7 +15,7 @@
 			: binding(binding), attributes(attributes) {}
 		};
 
-		/* ✓ */ struct TinyVertex {
+		struct TinyVertex {
 		public:
 			glm::vec2 texcoord;
             glm::vec3 position;
@@ -32,15 +32,15 @@
             }
 
             static const std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() {
-                std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
-				attributeDescriptions[0] = { .binding = 0, .location = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(TinyVertex, texcoord) };
-				attributeDescriptions[1] = { .binding = 0, .location = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(TinyVertex, position) };
-                attributeDescriptions[2] = { .binding = 0, .location = 2, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(TinyVertex, color) };
-                return attributeDescriptions;
+                return {
+					{ .binding = 0, .location = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(TinyVertex, texcoord) },
+					{ .binding = 0, .location = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(TinyVertex, position) },
+                	{ .binding = 0, .location = 2, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = offsetof(TinyVertex, color) }
+				};
             }
         };
 
-		/* ✓ */ struct TinyRenderShaders {
+		struct TinyRenderShaders {
 		public:
 			const std::vector<std::tuple<TinyShaderStages, std::string>> shaders;
 			std::vector<VkPushConstantRange> pushConstantRanges;
@@ -50,7 +50,7 @@
 			: shaders(shaders), pushConstantRanges(pushConstantRanges), descriptorBindings(descriptorBindings) {}
 		};
 
-		/* ✓ */ struct TinyPipelineCreateInfo {
+		struct TinyPipelineCreateInfo {
 		public:
 			bool blending;
 			bool interpolation;
@@ -65,32 +65,31 @@
 			}
 		};
 
-		/* ✓ */ class TinyPipeline : public TinyDisposable {
+		class TinyPipeline : public TinyDisposable {
 		public:
 			TinyVkDevice& vkdevice;
 			TinyPipelineCreateInfo createInfo;
-
-			//uint32_t maxComputeWorkGroups[3];
-			//uint32_t maxComputeSizeOfWorkGroups[3];
-
 			VkPipelineLayout layout = VK_NULL_HANDLE;
 			VkPipeline pipeline = VK_NULL_HANDLE;
 			VkQueue submitQueue = VK_NULL_HANDLE;
 			VkDescriptorSetLayout descriptorLayout = VK_NULL_HANDLE;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 
 			TinyPipeline operator=(const TinyPipeline&) = delete;
 			TinyPipeline(const TinyPipeline&) = delete;
 			~TinyPipeline() { this->Dispose(); }
 
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkdevice.DeviceWaitIdle();
+				if (waitIdle) vkQueueWaitIdle(submitQueue);
 				vkDestroyDescriptorSetLayout(vkdevice.logicalDevice, descriptorLayout, VK_NULL_HANDLE);
 				vkDestroyPipeline(vkdevice.logicalDevice, pipeline, VK_NULL_HANDLE);
 				vkDestroyPipelineLayout(vkdevice.logicalDevice, layout, VK_NULL_HANDLE);
 			}
 
-			TinyPipeline(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo) : vkdevice(vkdevice), createInfo(createInfo) {
+			TinyPipeline(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo, TinyRenderShaders shaders)
+			: vkdevice(vkdevice), createInfo(createInfo) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = Initialize(shaders);
 			}
 			
 			std::vector<char> ReadShaderFile(const std::string& path) {
@@ -122,17 +121,7 @@
 			VkResult Initialize(TinyRenderShaders shaders) {
 				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
 				if (!indices.hasGraphicsFamily) return VK_ERROR_INITIALIZATION_FAILED;
-				/*
-				if (createInfo.passType != TinyRenderPassType::COMPUTE && !indices.hasGraphicsFamily) return VK_ERROR_INITIALIZATION_FAILED;
-				if (createInfo.passType == TinyRenderPassType::COMPUTE && !indices.hasComputeFamily) return VK_ERROR_INITIALIZATION_FAILED;
-				*/
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				
-				/*switch(createInfo.passType) {
-					case TinyRenderPassType::GRAPHICS: vkGetDeviceQueue(vkdevice.logicalDevice, indices.graphicsFamily, 0, &submitQueue); break;
-					case TinyRenderPassType::COMPUTE: vkGetDeviceQueue(vkdevice.logicalDevice, indices.computeFamily, 0, &submitQueue); break;
-				}*/
+
 				vkGetDeviceQueue(vkdevice.logicalDevice, indices.graphicsFamily, 0, &submitQueue);
 
 				VkResult result = VK_SUCCESS;
@@ -167,7 +156,7 @@
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 				///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-				if (result == VK_SUCCESS /*&& createInfo.passType == TinyRenderPassType::GRAPHICS*/) {
+				if (result == VK_SUCCESS) {
 					result = vkCreatePipelineLayout(vkdevice.logicalDevice, &pipelineLayoutInfo, VK_NULL_HANDLE, &layout);
 
 					VkPipelineVertexInputStateCreateInfo vertexInputInfo = defaultVertexInputInfo;
@@ -214,51 +203,16 @@
 						result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, VK_NULL_HANDLE, &pipeline);
 						
 						#if TINY_ENGINE_VALIDATION
-						std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
+							std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
 						#endif
 					}
 				}
-
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				/*
-				if (result == VK_SUCCESS && (createInfo.passType == TinyRenderPassType::COMPUTE)) {
-					result = vkCreatePipelineLayout(vkdevice.logicalDevice, &pipelineLayoutInfo, VK_NULL_HANDLE, &layout);
-
-					VkPipelineShaderStageCreateInfo shaderPipelineCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_COMPUTE_BIT, .module = shaderModules[0], .pName = "main" };
-					VkComputePipelineCreateInfo computePipelineInfo = { .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, .flags = VK_PIPELINE_CREATE_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT, .stage = shaderPipelineCreateInfo, .layout = layout };
-
-					if (result == VK_SUCCESS) {
-						result = vkCreateComputePipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineInfo, VK_NULL_HANDLE, &pipeline);
-
-						#if TINY_ENGINE_VALIDATION
-						std::cout << "TinyEngine: Created compute processing pipeline->.." << std::endl;
-						#endif
-					}
-					
-					VkPhysicalDeviceProperties2 properties { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
-					vkGetPhysicalDeviceProperties2(vkdevice.physicalDevice, &properties);
-					for(int i = 0; i < 3; i++) {
-						maxComputeWorkGroups[i] = properties.properties.limits.maxComputeWorkGroupCount[i];
-						maxComputeSizeOfWorkGroups[i] = properties.properties.limits.maxComputeWorkGroupSize[i];
-					}
-				}
-				*/
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 				for(auto shaderModule : shaderModules)
 					if (shaderModule != VK_NULL_HANDLE)
 						vkDestroyShaderModule(vkdevice.logicalDevice, shaderModule, VK_NULL_HANDLE);
 				
 				return result;
-			}
-
-			template<typename... A>
-			inline static TinyObject<TinyPipeline> Construct(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo, TinyRenderShaders shaders) {
-				std::unique_ptr<TinyPipeline> object =
-					std::make_unique<TinyPipeline>(vkdevice, createInfo);
-				return TinyObject<TinyPipeline>(object, object->Initialize(shaders));
 			}
 			
 			inline static VkPushConstantRange GetPushConstantRange(TinyShaderStages shaderStages, uint32_t pushConstantRangeSize) {

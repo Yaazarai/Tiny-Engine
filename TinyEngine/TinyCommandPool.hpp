@@ -9,10 +9,11 @@
 		public:
 			TinyVkDevice& vkdevice;
 			VkCommandPool commandPool;
+			const bool useAsComputeCommandPool;
 			size_t bufferCount;
 			std::vector<std::pair<VkCommandBuffer, VkBool32>> commandBuffers;
 			static const size_t defaultCommandPoolSize = 32UL;
-			const bool useAsComputeCommandPool;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 
 			/// @brief Remove default copy destructor.
 			TinyCommandPool(const TinyCommandPool&) = delete;
@@ -32,21 +33,18 @@
 			/// @brief Creates a command pool to lease VkCommandBuffers from for recording render commands.
 			TinyCommandPool(TinyVkDevice& vkdevice, bool useAsComputeCommandPool, size_t bufferCount = defaultCommandPoolSize) : vkdevice(vkdevice), useAsComputeCommandPool(useAsComputeCommandPool), bufferCount(bufferCount) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = Initialize();
 			}
 
 			/// @brief Creates the underlyign command pool with: VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT enabled.
 			VkResult CreateCommandPool() {
-				VkCommandPoolCreateInfo poolInfo{};
-				poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-				poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
+				VkCommandPoolCreateInfo poolInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT };
 				TinyQueueFamily queueFamily = vkdevice.QueryPhysicalDeviceQueueFamilies();
 				
-				if (useAsComputeCommandPool && queueFamily.hasComputeFamily) {
-					poolInfo.queueFamilyIndex = queueFamily.computeFamily;
-				} else if (queueFamily.hasGraphicsFamily) poolInfo.queueFamilyIndex = queueFamily.graphicsFamily;
+				if (queueFamily.hasGraphicsFamily)
+					poolInfo.queueFamilyIndex = queueFamily.graphicsFamily;
 
-				VkResult result = (!queueFamily.hasGraphicsFamily || (useAsComputeCommandPool && !queueFamily.hasComputeFamily))? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS;
+				VkResult result = (!queueFamily.hasGraphicsFamily)? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS;
 				if (result == VK_SUCCESS)
                     result = vkCreateCommandPool(vkdevice.logicalDevice, &poolInfo, VK_NULL_HANDLE, &commandPool);
                 return result;
@@ -54,20 +52,20 @@
 
 			/// @brief Allocates CommandBuffers to host/user device memory with: VK_COMMAND_BUFFER_LEVEL_PRIMARY enabled.
 			VkResult CreateCommandBuffers(size_t bufferCount = 1) {
-				VkCommandBufferAllocateInfo allocInfo{};
-				allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-				allocInfo.commandPool = commandPool;
-				allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-				allocInfo.commandBufferCount = static_cast<uint32_t>(bufferCount);
+				VkCommandBufferAllocateInfo allocInfo {
+					.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+					.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+					.commandPool = commandPool,
+					.commandBufferCount = static_cast<uint32_t>(bufferCount)
+				};
 				
                 std::vector<VkCommandBuffer> temporary(bufferCount);
 				VkResult result = vkAllocateCommandBuffers(vkdevice.logicalDevice, &allocInfo, temporary.data());
 
-				if (result == VK_SUCCESS) {
+				if (result == VK_SUCCESS)
 					std::for_each(temporary.begin(), temporary.end(), [&buffers = commandBuffers](VkCommandBuffer cmdBuffer) {
 						buffers.push_back(std::pair(cmdBuffer, static_cast<VkBool32>(false)));
 					});
-				}
 
                 return result;
 			}
@@ -127,14 +125,6 @@
                     result = CreateCommandBuffers(bufferCount);
                 return result;
             }
-
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
-			template<typename... A>
-			inline static TinyObject<TinyCommandPool> Construct(TinyVkDevice& vkdevice, bool useAsComputeCommandPool, size_t bufferCount = defaultCommandPoolSize) {
-				std::unique_ptr<TinyCommandPool> object =
-					std::make_unique<TinyCommandPool>(vkdevice, useAsComputeCommandPool, bufferCount);
-				return TinyObject<TinyCommandPool>(object, object->Initialize());
-			}
 		};
 	}
 #endif

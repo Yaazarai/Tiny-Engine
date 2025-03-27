@@ -10,6 +10,7 @@
 			TinyPipeline& pipeline;
 
             TinyImage* targetImage;
+			const std::string title;
 			const VkBool32 pushToPresent;
 			const VkDeviceSize subpassIndex;
 			std::vector<TinyRenderPass*> dependencies;
@@ -17,22 +18,25 @@
 			VkSemaphore renderPassFinished;
 			VkFence renderPassSignal;
 			VkDeviceSize timelineWait;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 
 			TinyRenderPass operator=(const TinyRenderPass&) = delete;
 			TinyRenderPass(const TinyRenderPass&) = delete;
 			~TinyRenderPass() { this->Dispose(); }
-            void Disposable(bool waitIdle) {
+            
+			void Disposable(bool waitIdle) {
 				if (waitIdle) vkdevice.DeviceWaitIdle();
 				delete targetImage;
 			}
 
-			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, VkDeviceSize subpassIndex, VkExtent2D subpassExtent, const VkBool32 pushToPresent = VK_FALSE)
-			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), subpassIndex(subpassIndex), pushToPresent(pushToPresent), timelineWait(0) {
+			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkDeviceSize subpassIndex, VkExtent2D subpassExtent, const VkBool32 pushToPresent = VK_FALSE)
+			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), pushToPresent(pushToPresent), timelineWait(0) {
 				if (pushToPresent == VK_FALSE) {
 					targetImage = new TinyImage(vkdevice, TinyImageType::TYPE_COLORATTACHMENT, subpassExtent.width, subpassExtent.height, pipeline.createInfo.imageFormat, pipeline.createInfo.addressMode, pipeline.createInfo.interpolation);
 					targetImage->Initialize();
 				}
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = VK_SUCCESS;
 			}
 
 			VkResult AddDependency(TinyRenderPass& dependency) {
@@ -57,7 +61,7 @@
 				vkCmdPushDescriptorSetEKHR(pipeline.vkdevice.instance, cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.layout, 0, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data());
 			}
 			
-			VkResult BeginRecordCmdBuffer(VkCommandBuffer targetCmdBuffer, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }, const VkClearValue depthStencil = { .depthStencil = { 1.0f, 0 } }) {
+			VkResult BeginRecordCmdBuffer(VkCommandBuffer targetCmdBuffer, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }) {
 				VkCommandBufferBeginInfo beginInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT };
 
 				VkResult result = vkBeginCommandBuffer(targetCmdBuffer, &beginInfo);
@@ -83,7 +87,7 @@
                 return VK_SUCCESS;
 			}
 			
-			VkResult EndRecordCmdBuffer(VkCommandBuffer targetCmdBuffer, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }, const VkClearValue depthStencil = { .depthStencil = { 1.0f, 0 } }) {
+			VkResult EndRecordCmdBuffer(VkCommandBuffer targetCmdBuffer) {
 				VkResult result = vkCmdEndRenderingEKHR(pipeline.vkdevice.instance, targetCmdBuffer);
 				if (result != VK_SUCCESS) return result;
 
@@ -93,12 +97,21 @@
 				
 				return vkEndCommandBuffer(targetCmdBuffer);
 			}
+
+			void PushConstants(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, TinyShaderStages shaderFlags, uint32_t byteSize, const void* pValues) {
+				PushConstants(targetCmdBufferPair.first, shaderFlags, byteSize, pValues);
+			}
+
+			void PushDescriptorSet(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, std::vector<VkWriteDescriptorSet> writeDescriptorSets) {
+				PushDescriptorSet(targetCmdBufferPair.first, writeDescriptorSets);
+			}
 			
-			template<typename... A>
-			inline static TinyObject<TinyRenderPass> Construct(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, VkDeviceSize subpassIndex, VkExtent2D subpassExtent, const VkBool32 pushToPresent = VK_FALSE) {
-				std::unique_ptr<TinyRenderPass> object =
-					std::make_unique<TinyRenderPass>(vkdevice, cmdPool, pipeline, subpassIndex, subpassExtent, pushToPresent);
-				return TinyObject<TinyRenderPass>(object, VK_SUCCESS);
+			VkResult BeginRecordCmdBuffer(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }) {
+				return BeginRecordCmdBuffer(targetCmdBufferPair.first, clearColor);
+			}
+			
+			VkResult EndRecordCmdBuffer(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair) {
+				return EndRecordCmdBuffer(targetCmdBufferPair.first);
 			}
         };
 
@@ -114,13 +127,13 @@
 			TinySurfaceSupporter swapChainPresentDetails;
 			VkQueue swapChainPresentQueue;
 			VkSwapchainKHR swapChain;
+			uint32_t swapFrameIndex;
 			std::vector<TinyImage*> swapChainImages;
 
 			std::atomic_int64_t frameCounter, renderPassCounter;
 			std::atomic_bool presentable, refreshable, frameResized;
-			uint32_t swapFrameIndex;
-
 			std::vector<TinyRenderPass*> renderPasses;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 
 			TinyRenderGraph operator=(const TinyRenderGraph&) = delete;
 			TinyRenderGraph(const TinyRenderGraph&) = delete;
@@ -145,15 +158,20 @@
 
 			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window) : vkdevice(vkdevice), window(window), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				initialized = Initialize();
 			}
 			
-			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, VkExtent2D extent, VkDeviceSize subpassCount = 1, VkBool32 pushToPresent = VK_FALSE) {
+			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkExtent2D extent, VkDeviceSize subpassCount = 1, VkBool32 pushToPresent = VK_FALSE) {
 				std::vector<TinyRenderPass*> subpasses;
 				for(int32_t i = 0; i < std::max(1, static_cast<int32_t>(subpassCount)); i++) {
-					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, renderPassCounter ++, extent, (i == subpassCount - 1)? pushToPresent : VK_FALSE);
+					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extent, (i == subpassCount - 1)? pushToPresent : VK_FALSE);
 					renderPasses.push_back(renderpass);
 					subpasses.push_back(renderpass);
                     
+					#if TINY_ENGINE_VALIDATION
+					std::cout << "TinyEngine: Created graphics render pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
+					#endif
+
 					if (i > 0)
 						subpasses[i]->AddDependency(*subpasses[i - 1]);
 				}
@@ -269,13 +287,6 @@
 				}
 
 				return VK_SUCCESS;
-			}
-
-			template<typename... A>
-			inline static TinyObject<TinyRenderGraph> Construct(TinyVkDevice& vkdevice, TinyWindow* window) {
-				std::unique_ptr<TinyRenderGraph> object =
-					std::make_unique<TinyRenderGraph>(vkdevice, window);
-				return TinyObject<TinyRenderGraph>(object, object->Initialize());
 			}
 		};
     }

@@ -45,6 +45,7 @@
     #include <GLFW/glfw3native.h>
     #include <vulkan/vulkan.h>
     
+    #define VK_VALIDATION_LAYER_KHRONOS_EXTENSION_NAME "VK_LAYER_KHRONOS_validation"
     #ifdef _DEBUG
         #define TINY_ENGINE_WINDOWMAIN main(int argc, char* argv[])
         #define TINY_ENGINE_VALIDATION VK_TRUE
