@@ -10,6 +10,7 @@
 			int hwndWidth, hwndHeight, hwndXpos, hwndYpos;
             int minWidth, minHeight;
             std::string hwndTitle;
+			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 			
 			/// @brief GLFW window identifier handle (pointer).
             GLFWwindow* hwndWindow;
@@ -47,7 +48,7 @@
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose){this->Disposable(forceDispose); }));
 				onWindowResized.hook(TinyCallback<GLFWwindow*, int, int>([this](GLFWwindow* hwnd, int width, int height) { if (hwnd != hwndWindow) return; hwndWidth = width; hwndHeight = height; }));
 				onWindowPositionMoved.hook(TinyCallback<GLFWwindow*, int, int>([this](GLFWwindow* hwnd, int xpos, int ypos) { if (hwnd != hwndWindow) return; hwndXpos = xpos; hwndYpos = ypos; }));
-				glfwInit();
+				initialized = Initialize();
 			}
 
 			/// @brief Generates an event for window framebuffer resizing.
@@ -101,6 +102,7 @@
 				}
 			}
 			
+			/// @brief Explicitly set bordered/gullscreen mode.
 			void SetWindowMode(bool bordered = true, bool fullscreen = false) {
 				hwndBordered = bordered;
 				hwndFullscreen = fullscreen;
@@ -136,11 +138,13 @@
 				glfwSetWindowAttrib(hwndWindow, GLFW_DECORATED, (hwndBordered) ? GLFW_TRUE : GLFW_FALSE);
 			}
 
-            void ToggleFullscreen(int monitorIndex = 0) {
+			/// @brief Implicitly toggle fullscreen mode to specific monitor.
+			void ToggleFullscreen(int monitorIndex = 0) {
 				hwndFullscreen = !hwndFullscreen;
 				SetWindowMode(hwndBordered, hwndFullscreen);
 			}
 
+			/// @brief Implicitly toggle windowed / bordered mode.
 			void ToggleBordered() {
 				hwndBordered = !hwndBordered;
 				SetWindowMode(hwndBordered, hwndFullscreen);
@@ -167,14 +171,6 @@
 
                 return VK_ERROR_INITIALIZATION_FAILED;
             }
-			
-			/// @brief Constructor(...) + Initialize() with error result as combined TinyObject<Object,VkResult>.
-			template<typename... A>
-			inline static TinyObject<TinyWindow> Construct(std::string title, int width, int height, bool resizable, bool transparent  = false, bool bordered = true, bool fullscreen = false, bool hasMinSize = false, int minWidth = 200, int minHeight = 200) {
-				std::unique_ptr<TinyWindow> object =
-					std::make_unique<TinyWindow>(title, width, height, resizable, transparent, bordered, fullscreen, hasMinSize, minWidth, minHeight);
-				return TinyObject<TinyWindow>(object, object->Initialize());
-			}
         };
     }
 #endif

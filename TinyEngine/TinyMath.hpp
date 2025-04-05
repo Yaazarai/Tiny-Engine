@@ -4,46 +4,6 @@
     #include "./TinyEngine.hpp"
 
     namespace TINY_ENGINE_NAMESPACE {
-        /// @brief Default TinyVk shader vertex layout provided (optional).
-        struct TinyVertex {
-            glm::vec2 texcoord;
-            glm::vec3 position;
-            glm::vec4 color;
-
-            TinyVertex(glm::vec2 tex, glm::vec3 pos, glm::vec4 col) : texcoord(tex), position(pos), color(col) {}
-
-            static TinyVertexDescription GetVertexDescription() {
-                return TinyVertexDescription(GetBindingDescription(), GetAttributeDescriptions());
-            }
-
-            static VkVertexInputBindingDescription GetBindingDescription() {
-                VkVertexInputBindingDescription bindingDescription{};
-                bindingDescription.binding = 0;
-                bindingDescription.stride = sizeof(TinyVertex);
-                bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-                return bindingDescription;
-            }
-
-            static const std::vector<VkVertexInputAttributeDescription> GetAttributeDescriptions() {
-                std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
-                attributeDescriptions[0].binding = 0;
-                attributeDescriptions[0].location = 0;
-                attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-                attributeDescriptions[0].offset = offsetof(TinyVertex, texcoord);
-
-                attributeDescriptions[1].binding = 0;
-                attributeDescriptions[1].location = 1;
-                attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-                attributeDescriptions[1].offset = offsetof(TinyVertex, position);
-
-                attributeDescriptions[2].binding = 0;
-                attributeDescriptions[2].location = 2;
-                attributeDescriptions[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-                attributeDescriptions[2].offset = offsetof(TinyVertex, color);
-                return attributeDescriptions;
-            }
-        };
-
         /// @brief Default math coordinate and 2D camera projection functionality.
         class TinyMath {
 	    public:

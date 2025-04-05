@@ -42,6 +42,11 @@
             /// @brief Record of stored TinyCallback(s) to invoke.
             std::vector<TinyCallback<A...>> callbacks;
 
+            /// brief Clones this event's callbacks into another event with the same parameters.
+            void clone(TinyInvokable<A...> invokable) {
+                invokable.callbackk = this->callbacks;
+            }
+            
             /// @brief Adds a TinyCallback to this event, operator +=
             bool hook(const TinyCallback<A...> cb) {
                 TinyTimedGuard<> g(safety_lock);

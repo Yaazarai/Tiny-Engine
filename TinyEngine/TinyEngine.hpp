@@ -45,6 +45,7 @@
     #include <GLFW/glfw3native.h>
     #include <vulkan/vulkan.h>
     
+    #define VK_VALIDATION_LAYER_KHRONOS_EXTENSION_NAME "VK_LAYER_KHRONOS_validation"
     #ifdef _DEBUG
         #define TINY_ENGINE_WINDOWMAIN main(int argc, char* argv[])
         #define TINY_ENGINE_VALIDATION VK_TRUE
@@ -113,11 +114,11 @@
     #include "./Libraries/QuiteOkayImageFormat.h"
 
     #pragma region BACKEND_SYSTEMS
-        #include "./TinyEnums.hpp"
-        #include "./TinyTimedGuard.hpp"
-        #include "./TinyInvokableCallback.hpp"
-        #include "./TinyDisposable.hpp"
-        #include "./TinyUtilities.hpp"
+        #include "./Utilities/TinyEnums.hpp"
+        #include "./Utilities/TinyTimedGuard.hpp"
+        #include "./Utilities/TinyInvokableCallback.hpp"
+        #include "./Utilities/TinyDisposable.hpp"
+        #include "./Utilities/TinyUtilities.hpp"
     #pragma endregion
     #pragma region WINDOW_INPUT_HANDLING
         #include "./TinyWindow.hpp"
@@ -125,16 +126,14 @@
     #pragma region VULKAN_INITIALIZATION
         #include "./TinyVulkanDevice.hpp"
         #include "./TinyCommandPool.hpp"
-        #include "./TinyGraphicsPipeline.hpp"
+        #include "./TinyPipeline.hpp"
     #pragma endregion
     #pragma region TINY_RENDERING
-        #include "./TinyRenderContext.hpp"
         #include "./TinyBuffer.hpp"
         #include "./TinyImage.hpp"
-        #include "./TinyRenderer.hpp"
         #include "./TinySwapchain.hpp"
-        #include "./TinyCompute.hpp"
-        #include "./TinyResourceQueue.hpp"
+        #include "./TinyRenderCmd.hpp"
+        #include "./TinyRenderGraph.hpp"
         #include "./TinyMath.hpp"
     #pragma endregion
 #endif
