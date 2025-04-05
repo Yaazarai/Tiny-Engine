@@ -99,59 +99,6 @@
 			VkPresentModeKHR idealPresentMode = VK_PRESENT_MODE_FIFO_KHR;
 		};
 
-		class TinyRenderCmds {
-		public:
-			/// @brief Alias call for easy-calls to: vkCmdBindVertexBuffers + vkCmdBindIndexBuffer.
-			inline static void CmdBindGeometry(VkCommandBuffer cmdBuffer, const VkBuffer* vertexBuffers, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmdBuffer, firstDescriptorBinding, descriptorBindingCount, vertexBuffers, offsets);
-				vkCmdBindIndexBuffer(cmdBuffer, indexBuffer, indexOffset, indexType);
-			}
-
-			/// @brief Alias call for: vkCmdBindVertexBuffers.
-			inline static void CmdBindGeometryV(VkCommandBuffer cmdBuffer, const VkBuffer* vertexBuffers, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1) {
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmdBuffer, firstDescriptorBinding, descriptorBindingCount, vertexBuffers, offsets);
-			}
-
-			/// @brief Alias call for: vkCmdBindIndexBuffers.
-			inline static void CmdBindGeometryI(VkCommandBuffer cmdBuffer, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
-				vkCmdBindIndexBuffer(cmdBuffer, indexBuffer, indexOffset, indexType);
-			}
-
-			/// @brief Alias call for vkCmdDraw (isIndexed = false) and vkCmdDrawIndexed (isIndexed = true).
-			inline static void CmdDrawGeometry(VkCommandBuffer cmdBuffer, bool indexed, uint32_t instanceCount, uint32_t vertexCount, uint32_t firstInstance = 0, uint32_t firstIndex = 0, uint32_t firstVertexIndex = 0) {
-				switch (indexed) {
-					case true:
-					vkCmdDrawIndexed(cmdBuffer, vertexCount, instanceCount, firstIndex, firstVertexIndex, firstInstance);
-					break;
-					case false:
-					vkCmdDraw(cmdBuffer, vertexCount, instanceCount, firstVertexIndex, firstInstance);
-					break;
-				}
-			}
-
-			/// @brief Alias call for easy-calls to: vkCmdBindVertexBuffers + vkCmdBindIndexBuffer.
-			inline static void CmdBindGeometry(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer* vertexBuffers, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
-				CmdBindGeometry(targetCmdBufferPair.first, vertexBuffers, indexBuffer, indexOffset, firstDescriptorBinding, descriptorBindingCount, indexType);
-			}
-
-			/// @brief Alias call for: vkCmdBindVertexBuffers.
-			inline static void CmdBindGeometryV(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer* vertexBuffers, uint32_t firstDescriptorBinding = 0, uint32_t descriptorBindingCount = 1) {
-				CmdBindGeometryV(targetCmdBufferPair.first, vertexBuffers, firstDescriptorBinding, descriptorBindingCount);
-			}
-
-			/// @brief Alias call for: vkCmdBindIndexBuffers.
-			inline static void CmdBindGeometryI(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, const VkBuffer indexBuffer, const VkDeviceSize indexOffset = 0, VkIndexType indexType = VK_INDEX_TYPE_UINT32) {
-				CmdBindGeometryI(targetCmdBufferPair.first, indexBuffer, indexOffset, indexType);
-			}
-
-			/// @brief Alias call for vkCmdDraw (isIndexed = false) and vkCmdDrawIndexed (isIndexed = true).
-			inline static void CmdDrawGeometry(std::pair<VkCommandBuffer,int32_t> targetCmdBufferPair, bool indexed, uint32_t instanceCount, uint32_t vertexCount, uint32_t firstInstance = 0, uint32_t firstIndex = 0, uint32_t firstVertexIndex = 0) {
-				CmdDrawGeometry(targetCmdBufferPair.first, indexed, instanceCount, vertexCount, firstInstance, firstIndex, firstVertexIndex);
-			}
-		};
-
         #pragma endregion
 		#pragma region VULKAN_ENUMERATE_HELPER_FUNCTIONS
 

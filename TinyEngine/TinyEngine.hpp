@@ -114,11 +114,11 @@
     #include "./Libraries/QuiteOkayImageFormat.h"
 
     #pragma region BACKEND_SYSTEMS
-        #include "./TinyEnums.hpp"
-        #include "./TinyTimedGuard.hpp"
-        #include "./TinyInvokableCallback.hpp"
-        #include "./TinyDisposable.hpp"
-        #include "./TinyUtilities.hpp"
+        #include "./Utilities/TinyEnums.hpp"
+        #include "./Utilities/TinyTimedGuard.hpp"
+        #include "./Utilities/TinyInvokableCallback.hpp"
+        #include "./Utilities/TinyDisposable.hpp"
+        #include "./Utilities/TinyUtilities.hpp"
     #pragma endregion
     #pragma region WINDOW_INPUT_HANDLING
         #include "./TinyWindow.hpp"

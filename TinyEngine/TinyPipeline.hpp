@@ -40,18 +40,21 @@
             }
         };
 
-		struct TinyRenderShaders {
-		public:
-			const std::vector<std::tuple<TinyShaderStages, std::string>> shaders;
-			std::vector<VkPushConstantRange> pushConstantRanges;
-			std::vector<VkDescriptorSetLayoutBinding> descriptorBindings;
-
-			TinyRenderShaders(const std::vector<std::tuple<TinyShaderStages, std::string>> shaders, std::vector<VkPushConstantRange> pushConstantRanges = {}, std::vector<VkDescriptorSetLayoutBinding> descriptorBindings = {})
-			: shaders(shaders), pushConstantRanges(pushConstantRanges), descriptorBindings(descriptorBindings) {}
+		struct TinyShader {
+			public:
+				TinyShaderStages stage;
+				std::string shaderpath;
+				std::vector<uint32_t> pconstants;
+				std::vector<std::pair<TinyDescriptorType, TinyDescriptorBinding>> pdescriptors;
+				
+				TinyShader(TinyShaderStages stage, std::string shaderpath, std::vector<uint32_t> pconstants = {}, std::vector<std::pair<TinyDescriptorType, TinyDescriptorBinding>> pdescriptors = {})
+				: stage(stage), shaderpath(shaderpath), pconstants(pconstants), pdescriptors(pdescriptors) {}
 		};
 
 		struct TinyPipelineCreateInfo {
 		public:
+			std::vector<TinyShader> shaders;
+			TinyPipelineType type;
 			bool blending;
 			bool interpolation;
 			VkFormat imageFormat;
@@ -60,8 +63,20 @@
 			VkPolygonMode polygonTopology;
 			TinyVertexDescription vertexDescription;
 
-			static TinyPipelineCreateInfo CreateGraphicsPipeline(bool blending = true, bool interpolation = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
-				return { blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
+			static TinyPipelineCreateInfo GraphicsInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
+				return { {vertex, fragment}, TinyPipelineType::TYPE_GRAPHICS, blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
+			}
+
+			static TinyPipelineCreateInfo PresentInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
+				return { {vertex, fragment}, TinyPipelineType::TYPE_PRESENT, blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
+			}
+
+			static TinyPipelineCreateInfo ComputeInfo(TinyShader compute) {
+				return { {compute}, TinyPipelineType::TYPE_COMPUTE, true, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
+			}
+
+			static TinyPipelineCreateInfo TransferInfo() {
+				return { {}, TinyPipelineType::TYPE_TRANSFER, true, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
 			}
 		};
 
@@ -86,10 +101,10 @@
 				vkDestroyPipelineLayout(vkdevice.logicalDevice, layout, VK_NULL_HANDLE);
 			}
 
-			TinyPipeline(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo, TinyRenderShaders shaders)
+			TinyPipeline(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo)
 			: vkdevice(vkdevice), createInfo(createInfo) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
-				initialized = Initialize(shaders);
+				initialized = Initialize();
 			}
 			
 			std::vector<char> ReadShaderFile(const std::string& path) {
@@ -118,46 +133,52 @@
 				return shaderModule;
 			}
 			
-			VkResult Initialize(TinyRenderShaders shaders) {
+			VkResult Initialize() {
 				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
-				if (!indices.hasGraphicsFamily) return VK_ERROR_INITIALIZATION_FAILED;
-
-				vkGetDeviceQueue(vkdevice.logicalDevice, indices.graphicsFamily, 0, &submitQueue);
+				if (!indices.hasGraphicsFamily && !indices.hasPresentFamily && !indices.hasComputeFamily) return VK_ERROR_INITIALIZATION_FAILED;
+				
+				switch(createInfo.type) {
+					case TinyPipelineType::TYPE_GRAPHICS:
+					case TinyPipelineType::TYPE_TRANSFER:
+						vkGetDeviceQueue(vkdevice.logicalDevice, indices.graphicsFamily, 0, &submitQueue);
+					break;
+					case TinyPipelineType::TYPE_PRESENT:
+						vkGetDeviceQueue(vkdevice.logicalDevice, indices.presentFamily, 0, &submitQueue);
+					break;
+					case TinyPipelineType::TYPE_COMPUTE:
+						vkGetDeviceQueue(vkdevice.logicalDevice, indices.computeFamily, 0, &submitQueue);
+					break;
+				}
 
 				VkResult result = VK_SUCCESS;
+				if (createInfo.type == TinyPipelineType::TYPE_TRANSFER)
+					return result;
 
 				std::vector<VkPipelineShaderStageCreateInfo> shaderPipelineCreateInfo;
 				std::vector<VkShaderModule> shaderModules;
-				for (size_t i = 0; i < shaders.shaders.size(); i++) {
-					auto shaderCode = ReadShaderFile(std::get<1>(shaders.shaders[i]));
-					auto shaderModule = CreateShaderModule(shaderCode);
+				for(TinyShader shader : createInfo.shaders) {
+					std::vector<char> shaderCode = ReadShaderFile(shader.shaderpath);
+					VkShaderModule shaderModule = CreateShaderModule(shaderCode);
 
-					if (shaderModule == VK_NULL_HANDLE) {
-						result = VK_ERROR_INVALID_SHADER_NV;
-						for(auto shaderModule : shaderModules)
-							if (shaderModule != VK_NULL_HANDLE)
-								vkDestroyShaderModule(vkdevice.logicalDevice, shaderModule, VK_NULL_HANDLE);
-						return result;
-					}
-
-					shaderModules.push_back(shaderModule);
-					shaderPipelineCreateInfo.push_back({ .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = (VkShaderStageFlagBits) std::get<0>(shaders.shaders[i]), .module = shaderModule, .pName = "main" });
+					if (shaderModule != VK_NULL_HANDLE) {
+						shaderModules.push_back(shaderModule);
+						shaderPipelineCreateInfo.push_back({ .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = (VkShaderStageFlagBits) shader.stage, .module = shaderModule, .pName = "main" });
+					} else { result = VK_ERROR_INVALID_SHADER_NV; break; }
 				}
 				
-				VkPipelineLayoutCreateInfo pipelineLayoutInfo { .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, .pushConstantRangeCount = static_cast<uint32_t>(shaders.pushConstantRanges.size()), .pPushConstantRanges = shaders.pushConstantRanges.data() };
-
-				if (shaders.descriptorBindings.size() > 0) {
-					VkDescriptorSetLayoutCreateInfo descriptorCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, .pBindings = shaders.descriptorBindings.data(), .bindingCount = static_cast<uint32_t>(shaders.descriptorBindings.size()) };
-					result = vkCreateDescriptorSetLayout(vkdevice.logicalDevice, &descriptorCreateInfo, VK_NULL_HANDLE, &descriptorLayout);
-					pipelineLayoutInfo.setLayoutCount = 1;
-					pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
-				}
-
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-				///////////////////////////////////////////////////////////////////////////////////////////////////////
-
 				if (result == VK_SUCCESS) {
-					result = vkCreatePipelineLayout(vkdevice.logicalDevice, &pipelineLayoutInfo, VK_NULL_HANDLE, &layout);
+					std::vector<VkPushConstantRange> pconstants;
+					for(TinyShader shader : createInfo.shaders)
+						for(uint32_t range : shader.pconstants)
+							pconstants.push_back(TinyPipeline::GetPushConstantRange(shader.stage, range));
+	
+					std::vector<VkDescriptorSetLayoutBinding> pdescriptors;
+					for(TinyShader shader : createInfo.shaders)
+						for(std::pair<TinyDescriptorType, TinyDescriptorBinding> type : shader.pdescriptors)
+							pdescriptors.push_back(TinyPipeline::GetPushDescriptorLayoutBinding(shader.stage, static_cast<uint32_t>(type.second), type.first, 1));
+					
+					VkDescriptorSetLayoutCreateInfo descriptorCreateInfo { .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR, .pBindings = pdescriptors.data(), .bindingCount = static_cast<uint32_t>(pdescriptors.size()) };
+					result = vkCreateDescriptorSetLayout(vkdevice.logicalDevice, &descriptorCreateInfo, VK_NULL_HANDLE, &descriptorLayout);
 
 					VkPipelineVertexInputStateCreateInfo vertexInputInfo = defaultVertexInputInfo;
 						vertexInputInfo.vertexBindingDescriptionCount = 1;
@@ -181,6 +202,14 @@
 						depthStencilInfo.depthTestEnable = VK_FALSE;
 						depthStencilInfo.depthWriteEnable = VK_FALSE;
 					
+					VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+						.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+						.pushConstantRangeCount = static_cast<uint32_t>(pconstants.size()),
+						.pPushConstantRanges = pconstants.data(),
+						.setLayoutCount = (descriptorLayout != VK_NULL_HANDLE)? 1U : 0U, .pSetLayouts = &descriptorLayout
+					};
+					result = vkCreatePipelineLayout(vkdevice.logicalDevice, &pipelineLayoutInfo, VK_NULL_HANDLE, &layout);
+					
 					VkGraphicsPipelineCreateInfo graphicsPipelineInfo {
 						.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 						.stageCount = static_cast<uint32_t>(shaderPipelineCreateInfo.size()),
@@ -198,20 +227,34 @@
 						.renderPass = VK_NULL_HANDLE, .subpass = 0,
 						.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
 					};
+					
+					VkComputePipelineCreateInfo computePipelineInfo {
+						.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+						.stage = shaderPipelineCreateInfo[0],
+						.layout = layout,
+						.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
+					};
 
-					if (result == VK_SUCCESS) {
-						result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, VK_NULL_HANDLE, &pipeline);
-						
-						#if TINY_ENGINE_VALIDATION
-							std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
-						#endif
+					switch(createInfo.type) {
+						case TinyPipelineType::TYPE_GRAPHICS:
+						case TinyPipelineType::TYPE_PRESENT:
+							result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, VK_NULL_HANDLE, &pipeline);
+						break;
+						case TinyPipelineType::TYPE_COMPUTE:
+							result = vkCreateComputePipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineInfo, VK_NULL_HANDLE, &pipeline);
+						break;
+						case TinyPipelineType::TYPE_TRANSFER:
+						break;
 					}
+					
+					#if TINY_ENGINE_VALIDATION
+						std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
+					#endif
 				}
 
 				for(auto shaderModule : shaderModules)
 					if (shaderModule != VK_NULL_HANDLE)
 						vkDestroyShaderModule(vkdevice.logicalDevice, shaderModule, VK_NULL_HANDLE);
-				
 				return result;
 			}
 			

@@ -4,12 +4,22 @@
 	#include "./TinyEngine.hpp"
 
 	namespace TINY_ENGINE_NAMESPACE {
+		/// Specifies the pipeline type (Graphics/Present, Compute or Transfer--no pipeline).
+		enum TinyPipelineType {
+			TYPE_GRAPHICS,
+			TYPE_COMPUTE,
+			TYPE_PRESENT,
+			TYPE_TRANSFER
+		};
+		
 		/// Valid implemented shader stages in Tiny-Engine.
 		enum TinyShaderStages {
 			/// @brief Vertex (Point) stage pre-rasterization.
 			STAGE_VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
 			/// @brief Fragment (Pixel) stage post-rasterization.
-			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT
+			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
+			/// @brief Compute stage (non-rendering).
+			STAGE_COMPUTE = VK_SHADER_STAGE_COMPUTE_BIT
 		};
 		
 		/// Specifies tghe object type we're sending to our shader: image, buffer, etc.
@@ -22,6 +32,20 @@
 			TYPE_UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 			/// @brief Read/Write buffer type for compute shaders.
 			TYPE_STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+		};
+
+		/// Descriptor binding indices/values.
+		enum TinyDescriptorBinding {
+			BINDING_0 = 0,
+			BINDING_1 = 1,
+			BINDING_2 = 2,
+			BINDING_3 = 3,
+			BINDING_4 = 4,
+			BINDING_5 = 5,
+			BINDING_6 = 6,
+			BINDING_7 = 7,
+			BINDING_8 = 8,
+			BINDING_9 = 9
 		};
 
 		/// @brief Buffer-Type for rendering operations.

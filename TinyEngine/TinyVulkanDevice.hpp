@@ -7,12 +7,13 @@
 	namespace TINY_ENGINE_NAMESPACE {
 		/// @brief Vulkan Queue Family flags.
 		struct TinyQueueFamily {
-			uint32_t graphicsFamily, presentFamily;
-			bool hasGraphicsFamily, hasPresentFamily;
+			uint32_t graphicsFamily, presentFamily, computeFamily;
+			bool hasGraphicsFamily, hasPresentFamily, hasComputeFamily;
 
-			TinyQueueFamily() : graphicsFamily(0), presentFamily(0), hasGraphicsFamily(false), hasPresentFamily(false) {}
+			TinyQueueFamily() : graphicsFamily(0), presentFamily(0), computeFamily(0), hasGraphicsFamily(false), hasPresentFamily(false), hasComputeFamily(false) {}
 			void SetGraphicsFamily(uint32_t queueFamily) { graphicsFamily = queueFamily; hasGraphicsFamily = true; }
 			void SetPresentFamily(uint32_t queueFamily) { presentFamily = queueFamily; hasPresentFamily = true; }
+			void SetComputeFamily(uint32_t queueFamily) { computeFamily = queueFamily; hasComputeFamily = true; }
 		};
 
 		/// @brief Vulkan Instance & Render(Physical/Logical) Device & VMAllocator Loader.
@@ -30,7 +31,7 @@
 			};
 			std::vector<const char*> instanceExtensions = {  };
 
-			const bool useTimestampBits, useGraphicsBit, usePresentBit;
+			const bool useTimestampBit, useComputeBit, useGraphicsBit, usePresentBit;
 			VkPhysicalDeviceFeatures deviceFeatures = {};
 			VkInstance instance = VK_NULL_HANDLE;
 			VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
@@ -65,8 +66,8 @@
 			}
 
 			/// @brief Create managed VkDevice via Vulkan API. Initializes Vulkan: Must call Initialize() manually.
-			TinyVkDevice(bool useGraphicsBit = true, bool useTimestampBits = false, bool usePresentBit = false, TinyWindow* window = VK_NULL_HANDLE, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE })
-			: window(window), useTimestampBits(useTimestampBits), useGraphicsBit(useGraphicsBit), usePresentBit(usePresentBit), deviceFeatures(deviceFeatures) {
+			TinyVkDevice(bool useGraphicsBit = true, bool usePresentBit = false, bool useComputeBit = false, bool useTimestampBit = false, TinyWindow* window = VK_NULL_HANDLE, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE })
+			: window(window), useGraphicsBit(useGraphicsBit), usePresentBit(usePresentBit), useComputeBit(useComputeBit), useTimestampBit(useTimestampBit), deviceFeatures(deviceFeatures) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
 			}
@@ -82,7 +83,7 @@
 				std::vector<VkQueueFamilyProperties> queueFamilies;
 				QueryQueueFamilyProperties(physicalDevice, queueFamilies);
 				
-				int32_t useOutputBits = static_cast<int32_t>(useTimestampBits) + static_cast<int32_t>(useGraphicsBit) + static_cast<int32_t>(usePresentBit);
+				int32_t useOutputBits = static_cast<int32_t>(useGraphicsBit) + static_cast<int32_t>(usePresentBit) + static_cast<int32_t>(useComputeBit) + static_cast<int32_t>(useTimestampBit);
 				TinyQueueFamily indices = {};
 				for (int i = 0; i < queueFamilies.size(); i++) {
 					VkBool32 presentSupport = false;
@@ -90,6 +91,7 @@
 
 					if (useGraphicsBit && !indices.hasGraphicsFamily && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
 					if (usePresentBit && !indices.hasPresentFamily && presentSupport && queueFamilies[i].timestampValidBits > 0) { indices.SetPresentFamily(i); useOutputBits --; }
+					if (useComputeBit && !indices.hasComputeFamily && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
 					if (useOutputBits <= 0) break;
 				}
 				return indices;
@@ -127,6 +129,7 @@
 					std::cout << "\tPush Descriptor Memory:  " << pushDescriptorProperties.maxPushDescriptors << " Count" << std::endl;
 					std::cout << "\tPipelines:               Graphics = " << (indices.hasGraphicsFamily?"true":"false") << std::endl;
 					std::cout << "\tPipelines:               Present  = " << (indices.hasPresentFamily?"true":"false") << std::endl;
+					std::cout << "\tPipelines:               Compute  = " << (indices.hasComputeFamily?"true":"false") << std::endl;
 				#endif
 				return VK_SUCCESS;
 			}

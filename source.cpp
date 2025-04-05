@@ -1,33 +1,30 @@
 #include "./TinyEngine/TinyEngine.hpp"
 using namespace tny;
 
-#define DEFAULT_TEXTURE "./Images/icons_default.qoi"
+//efine DEFAULT_TEXTURE "./Images/icons_default.qoi"
+#define DEFAULT_FRAGMENT_SHADER "./Shaders/default_output_frag.spv"
 #define SPRITE_VERTEX_SHADER "./Shaders/texture_output_vert.spv"
 #define SPRITE_FRAGMENT_SHADER "./Shaders/texture_output_frag.spv"
-#define DEFAULT_FRAGMENT_SHADER "./Shaders/default_output_frag.spv"
 
 int TINY_ENGINE_WINDOWMAIN {
     TinyWindow window ("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
-    TinyVkDevice vkdevice(true, false, true, &window);
+    TinyVkDevice vkdevice(true, true, false, false, &window);
     TinyCommandPool cmdpool(vkdevice, false);
-    
-    const std::tuple<TinyShaderStages, std::string> vshader_txtout = { TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER };
-    const std::tuple<TinyShaderStages, std::string> fshader_default = { TinyShaderStages::STAGE_FRAGMENT, DEFAULT_FRAGMENT_SHADER };
-    const std::tuple<TinyShaderStages, std::string> fshader_txtout = { TinyShaderStages::STAGE_FRAGMENT, SPRITE_FRAGMENT_SHADER };
-    const std::vector<VkPushConstantRange>& pconstant_txtout = { TinyPipeline::GetPushConstantRange(TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4)) };
-    const std::vector<VkDescriptorSetLayoutBinding> playout_txtout = { TinyPipeline::GetPushDescriptorLayoutBinding(TinyShaderStages::STAGE_FRAGMENT, 0, TinyDescriptorType::TYPE_IMAGE_SAMPLER, 1) };
-    
-    TinyRenderShaders shaders = { { vshader_txtout, fshader_default }, pconstant_txtout, {} };
-    TinyRenderShaders shaders2 = { { vshader_txtout, fshader_txtout }, pconstant_txtout, playout_txtout };
-    TinyPipelineCreateInfo createInfo = TinyPipelineCreateInfo::CreateGraphicsPipeline(true, false, VK_FORMAT_B8G8R8A8_UNORM);
 
-    TinyPipeline pipeline(vkdevice, createInfo, shaders);
-    TinyPipeline pipeline2(vkdevice, createInfo, shaders2);
+    TinyShader vertexShader(TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER,{ sizeof(glm::mat4) }, {});
+    TinyShader defaultFragShader(TinyShaderStages::STAGE_FRAGMENT, DEFAULT_FRAGMENT_SHADER, {}, {{TinyDescriptorType::TYPE_IMAGE_SAMPLER, TinyDescriptorBinding::BINDING_0}});
+    TinyShader fragShader(TinyShaderStages::STAGE_FRAGMENT, SPRITE_FRAGMENT_SHADER, {}, {{TinyDescriptorType::TYPE_IMAGE_SAMPLER, TinyDescriptorBinding::BINDING_0}});
+    
+    TinyPipeline pipeline1(vkdevice, TinyPipelineCreateInfo::TransferInfo());
+    TinyPipeline pipeline2(vkdevice, TinyPipelineCreateInfo::GraphicsInfo(vertexShader, defaultFragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
+    TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
     TinyRenderGraph graph(vkdevice, &window);
 
-    std::vector<TinyRenderPass*> renderpass = graph.CreateRenderPass(cmdpool, pipeline, "Texture Input Pass", { 1920, 1080 }, 1, VK_FALSE);
-    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool, pipeline2, "Copy Pass", { 1920, 1080 }, 1, VK_TRUE);
-    renderpass2[0]->AddDependency(*renderpass[0]);
+    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, "Staging Data Pass", { 1920, 1080 }, 1);
+    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool, pipeline2, "Texture Input Pass", { 1920, 1080 }, 1);
+    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", { 1920, 1080 }, 1);
+    renderpass2[0]->AddDependency(*renderpass1[0]);
+    renderpass3[0]->AddDependency(*renderpass2[0]);
     
     std::vector<TinyVertex> triangles = {
         TinyVertex({0.0f,0.0f}, {240.0f,135.0f,               0.0f}, {1.0f,0.0f,0.0f,1.0f}),
@@ -35,70 +32,68 @@ int TINY_ENGINE_WINDOWMAIN {
         TinyVertex({0.0f,0.0f}, {240.0f+960.0f,135.0f+540.0f, 0.0f}, {1.0f,0.0f,1.0f,1.0f}),
         TinyVertex({0.0f,0.0f}, {240.0f,135.0f + 540.0f,      0.0f}, {0.0f,0.0f,1.0f,1.0f})
     };
+    std::vector<TinyVertex> triangles2 = TinyQuad::Create(glm::vec4(0.0, 0.0, 1920.0, 1080.0), 1.0, TinyQuad::defvcolors);
     std::vector<uint32_t> indices = {0,1,2,2,3,0};
 
     size_t sizeofTriangles = TinyMath::GetSizeofVector<TinyVertex>(triangles);
     TinyBuffer vbuffer(vkdevice, TinyBufferType::TYPE_VERTEX, sizeofTriangles);
-    TinySingleSubmitCmds::StageBufferData(vbuffer, pipeline, cmdpool, triangles.data(), sizeofTriangles);
-    
     size_t sizeofIndices = TinyMath::GetSizeofVector<uint32_t>(indices);
     TinyBuffer ibuffer(vkdevice, TinyBufferType::TYPE_INDEX, sizeofIndices);
-    TinySingleSubmitCmds::StageBufferData(ibuffer, pipeline, cmdpool, indices.data(), sizeofIndices);
-
-    std::vector<TinyVertex> triangles2 = TinyQuad::Create(glm::vec4(0.0, 0.0, 1920.0, 1080.0), 1.0, TinyQuad::defvcolors);
     size_t sizeofTriangles2 = TinyMath::GetSizeofVector<TinyVertex>(triangles2);
     TinyBuffer vbuffer2(vkdevice, TinyBufferType::TYPE_VERTEX, sizeofTriangles2);
-    TinySingleSubmitCmds::StageBufferData(vbuffer2, pipeline2, cmdpool, triangles2.data(), sizeofTriangles2);
     
     glm::mat4 camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
     //TinyObject<TinyBuffer> projection = TinyBuffer::Construct(vkdevice, TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
-    //TinySingleSubmitCmds::StageBufferData(projection, pipeline, cmdpool, &camera, sizeof(glm::mat4));
+
+    VkDeviceSize stagingSize = glm::pow(2, glm::ceil(glm::log2(static_cast<float>(sizeofTriangles + sizeofTriangles2 + sizeofIndices + sizeof(glm::mat4)))));
+    std::cout << "Staging Buffer Size: " << stagingSize << " : " << (sizeofTriangles + sizeofTriangles2 + sizeofIndices + sizeof(glm::mat4)) << std::endl;
+    TinyBuffer stagingBuffer(vkdevice, TinyBufferType::TYPE_STAGING, stagingSize);
+
+    renderpass1[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
+        [&stagingBuffer, &indices, &triangles2, &triangles, &vbuffer2, &vbuffer, &ibuffer, &sizeofTriangles, &sizeofTriangles2, &sizeofIndices](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+        auto cmdbuffer = renderpass.BeginStageCmdBuffer();
+            VkDeviceSize offset = 0;
+            renderpass.StageBuffer(cmdbuffer, stagingBuffer, ibuffer, indices.data(), sizeofIndices, offset);
+            renderpass.StageBuffer(cmdbuffer, stagingBuffer, vbuffer, triangles.data(), sizeofTriangles, offset);
+            renderpass.StageBuffer(cmdbuffer, stagingBuffer, vbuffer2, triangles2.data(), sizeofTriangles2, offset);
+        renderpass.EndStageCmdBuffer(cmdbuffer);
+        writeCmdBuffers.push_back(cmdbuffer.first);
+    }));
     
-    //VkClearValue clearColor{ .color.float32 = { 0.0, 0.0, 0.0, 1.0 } };
-
-    renderpass[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
-        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
-        auto commandBuffer = commandPool.LeaseBuffer();
-        
-        renderpass.BeginRecordCmdBuffer(commandBuffer /*, clearColor*/);
-            //VkDescriptorBufferInfo cameraDescriptorInfo = projection.ref().GetDescriptorInfo();
-            //VkWriteDescriptorSet cameraDescriptor = projection.ref().GetWriteDescriptor(0, 1, { &cameraDescriptorInfo });
-            //renderpass.PushDescriptorSet(commandBuffer, { cameraDescriptor });
-            
-            if (frameResized) 
+    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
+        [&cmdpool, &camera, &indices, &vkdevice, &window, &graph, &pipeline2, &triangles2, &triangles, &vbuffer2, &vbuffer, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+        auto cmdbuffer = renderpass.BeginRecordCmdBuffer();
+            if (frameResized)
                 camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
-
-            renderpass.PushConstants(commandBuffer, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4), &camera);
-            TinyRenderCmds::CmdBindGeometry(commandBuffer, &vbuffer.buffer, ibuffer.buffer);
-            TinyRenderCmds::CmdDrawGeometry(commandBuffer, true, 1, indices.size());
-        renderpass.EndRecordCmdBuffer(commandBuffer);
-        writeCmdBuffers.push_back(commandBuffer.first);
+            
+            renderpass.PushConstants(cmdbuffer, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4), &camera);
+            renderpass.CmdBindGeometry(cmdbuffer, &vbuffer.buffer, ibuffer.buffer);
+            renderpass.CmdDrawGeometry(cmdbuffer, true, 1, indices.size());
+        renderpass.EndRecordCmdBuffer(cmdbuffer);
+        writeCmdBuffers.push_back(cmdbuffer.first);
     }));
 
-    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
-        [&camera, &indices, &vkdevice, &window, &graph, &pipeline, &vbuffer2, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
-        auto commandBuffer = commandPool.LeaseBuffer();
-        
-        renderpass.BeginRecordCmdBuffer(commandBuffer/*, clearColor*/);
+    renderpass3[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
+        [&cmdpool, &camera, &indices, &vkdevice, &window, &graph, &pipeline3, &triangles2, &vbuffer2, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+        auto cmdbuffer = renderpass.BeginRecordCmdBuffer();
             VkDescriptorImageInfo imageDescriptor = renderpass.dependencies[0]->targetImage->GetDescriptorInfo();
             VkWriteDescriptorSet imageDescriptorSet = renderpass.dependencies[0]->targetImage->GetWriteDescriptor(0, 1, &imageDescriptor);
-            renderpass.PushDescriptorSet(commandBuffer, { imageDescriptorSet });
-            
-            renderpass.PushConstants(commandBuffer, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4), &camera);
-            TinyRenderCmds::CmdBindGeometry(commandBuffer, &vbuffer2.buffer, ibuffer.buffer);
-            TinyRenderCmds::CmdDrawGeometry(commandBuffer, true, 1, indices.size());
-        renderpass.EndRecordCmdBuffer(commandBuffer);
-        writeCmdBuffers.push_back(commandBuffer.first);
+            renderpass.PushDescriptorSet(cmdbuffer, { imageDescriptorSet });
+            renderpass.PushConstants(cmdbuffer, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4), &camera);
+            renderpass.CmdBindGeometry(cmdbuffer, &vbuffer2.buffer, ibuffer.buffer);
+            renderpass.CmdDrawGeometry(cmdbuffer, true, 1, indices.size());
+        renderpass.EndRecordCmdBuffer(cmdbuffer);
+        writeCmdBuffers.push_back(cmdbuffer.first);
     }));
     
     std::thread mythread([&window, &graph, &vkdevice]() {
         while (window.ShouldExecute())
             graph.RenderSwapChain();
-            //std::cout << graph.ref().frameCounter << std::endl;
+            //std::cout << graph.frameCounter << std::endl;
     });
     window.WhileMain(TinyWindowEvents::WAIT_EVENTS);
+    
     mythread.join();
     vkdevice.DeviceWaitIdle();
-
     return VK_SUCCESS;
 };
