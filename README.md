@@ -2,4 +2,11 @@
 Game/Render engine based on Vulkan (final rewrite of [TinyVK](https://github.com/Yaazarai/TinyVK) from commit [8013101](https://github.com/Yaazarai/TinyVK/commit/80131018a9d4781a781ea413576e73e33cbf3c2c)). The goal of this project split (not branch) off from TinyVK and re-write the core of the renderer to be both more robust and to provide a proper interface for error handling. Error handling in TinyVK previously was handled via exceptions and would simply crash any-time an exception was reached. Instead now everything is handled properly with error-codes (VkResult errors) and initialization() functions. This errors can be captured instead of crashing and handled gracefully. The core design and functionality of the renderer is the same, however with major improvements to reduce overall implementation redundancy.
 
 ### Why Tiny-Engine (Tiny Vulkan Engine)?
-Tiny-Engine is a great simple renderer (with 2D applications in mind) designed for rapid C++ graphics development, easily compatible with ImGUI for UI applications if needed or standalone for game development. This was not designed for large 3D Voxel rendering projects or the like complexity.
+Tiny-Engine is a simple renderer (with 2D applications in mind) designed for rapid C++ graphics development, easily compatible with ImGUI for UI applications if needed or standalone for game development. This was not designed for large 3D Voxel rendering projects or the like complexity.
+
+### Render Graph
+While VkGuide and Vulkan-Tutorial blogs are great for learning the Vulkan pipeline, they don't focus on how to write a proper Vulkkan renderer. Tiny-Engine (as of 04-04-2025) now supports auto-synchronized render passes via a "Render Graph," which lets you create render passes, determine how they depend on each other and then automatically synchronizes those render passes.
+
+The Render Graph has one key issue you have to always be aware of: circular dependencies. This is when two or more render passes chain into themselves creating a infinite loop. The easy solution is that each renderpass gets a unique iterative ID representing where it occurs in the graph and no renderpass can have dependencies that occur later in the graph.
+
+This also works great with Timeline Semaphores, which we can use to assign each renderpass a place on a timeline and have that renderpass' execution wait until a specific point in the timeline is reached. This way we renderpass waits on a point in the timeline, executes, then updates the timeline for the next renderpass.
