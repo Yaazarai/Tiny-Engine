@@ -8,7 +8,7 @@ using namespace tny;
 
 int TINY_ENGINE_WINDOWMAIN {
     TinyWindow window ("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
-    TinyVkDevice vkdevice(true, true, false, false, &window);
+    TinyVkDevice vkdevice(true, true, false, true, &window);
     TinyCommandPool cmdpool(vkdevice, false);
 
     TinyShader vertexShader(TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER,{ sizeof(glm::mat4) }, {});
@@ -46,11 +46,11 @@ int TINY_ENGINE_WINDOWMAIN {
     //TinyObject<TinyBuffer> projection = TinyBuffer::Construct(vkdevice, TinyBufferType::TYPE_UNIFORM, sizeof(glm::mat4));
 
     VkDeviceSize stagingSize = glm::pow(2, glm::ceil(glm::log2(static_cast<float>(sizeofTriangles + sizeofTriangles2 + sizeofIndices + sizeof(glm::mat4)))));
-    std::cout << "Staging Buffer Size: " << stagingSize << " : " << (sizeofTriangles + sizeofTriangles2 + sizeofIndices + sizeof(glm::mat4)) << std::endl;
     TinyBuffer stagingBuffer(vkdevice, TinyBufferType::TYPE_STAGING, stagingSize);
 
-    renderpass1[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
-        [&stagingBuffer, &indices, &triangles2, &triangles, &vbuffer2, &vbuffer, &ibuffer, &sizeofTriangles, &sizeofTriangles2, &sizeofIndices](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+    renderpass1[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+        triangles2 = TinyQuad::Create(glm::vec4(0.0, 0.0, window.hwndWidth, window.hwndHeight), 1.0, TinyQuad::defvcolors);
+        
         auto cmdbuffer = renderpass.BeginStageCmdBuffer();
             VkDeviceSize offset = 0;
             renderpass.StageBuffer(cmdbuffer, stagingBuffer, ibuffer, indices.data(), sizeofIndices, offset);
@@ -60,8 +60,7 @@ int TINY_ENGINE_WINDOWMAIN {
         writeCmdBuffers.push_back(cmdbuffer.first);
     }));
     
-    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
-        [&cmdpool, &camera, &indices, &vkdevice, &window, &graph, &pipeline2, &triangles2, &triangles, &vbuffer2, &vbuffer, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
         auto cmdbuffer = renderpass.BeginRecordCmdBuffer();
             if (frameResized)
                 camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
@@ -73,8 +72,9 @@ int TINY_ENGINE_WINDOWMAIN {
         writeCmdBuffers.push_back(cmdbuffer.first);
     }));
 
-    renderpass3[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>(
-        [&cmdpool, &camera, &indices, &vkdevice, &window, &graph, &pipeline3, &triangles2, &vbuffer2, &ibuffer/*, &projection, &clearColor*/](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+    renderpass3[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+        camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
+
         auto cmdbuffer = renderpass.BeginRecordCmdBuffer();
             VkDescriptorImageInfo imageDescriptor = renderpass.dependencies[0]->targetImage->GetDescriptorInfo();
             VkWriteDescriptorSet imageDescriptorSet = renderpass.dependencies[0]->targetImage->GetWriteDescriptor(0, 1, &imageDescriptor);
@@ -87,9 +87,18 @@ int TINY_ENGINE_WINDOWMAIN {
     }));
     
     std::thread mythread([&window, &graph, &vkdevice]() {
-        while (window.ShouldExecute())
+        while (window.ShouldExecute()) {
             graph.RenderSwapChain();
-            //std::cout << graph.frameCounter << std::endl;
+            
+            #if TINY_ENGINE_VALIDATION
+                if (vkdevice.useTimestampBit)
+                    for(TinyRenderPass* pass : graph.renderPasses) {
+                        std::vector<float> timestamps = pass->QueryTimeStamps();
+                        for(float time : timestamps)
+                            std::cout << "[" << graph.frameCounter << "] " << pass->title << " : " << time << " ms" << std::endl;
+                    }
+            #endif
+        }
     });
     window.WhileMain(TinyWindowEvents::WAIT_EVENTS);
     

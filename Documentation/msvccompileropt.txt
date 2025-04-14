@@ -34,6 +34,7 @@ CL.EXE COMPATIBILITY OPTIONS:
   /Gd                     Set __cdecl as a default calling convention
   /GF-                    Disable string pooling
   /GF                     Enable string pooling (default)
+  /GL                     Enable whole program optimization
   /GR-                    Disable emission of RTTI data
   /Gregcall               Set __regcall as a default calling convention
   /GR                     Enable emission of RTTI data
