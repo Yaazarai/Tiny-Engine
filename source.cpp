@@ -8,7 +8,7 @@ using namespace tny;
 
 int TINY_ENGINE_WINDOWMAIN {
     TinyWindow window ("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
-    TinyVkDevice vkdevice(true, true, false, true, &window);
+    TinyVkDevice vkdevice(true, true, false, false, &window);
     TinyCommandPool cmdpool(vkdevice, false);
 
     TinyShader vertexShader(TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER,{ sizeof(glm::mat4) }, {});
@@ -19,12 +19,13 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyPipeline pipeline2(vkdevice, TinyPipelineCreateInfo::GraphicsInfo(vertexShader, defaultFragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
     TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
     TinyRenderGraph graph(vkdevice, &window);
-
-    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, "Staging Data Pass", { 1920, 1080 }, 1);
-    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool, pipeline2, "Texture Input Pass", { 1920, 1080 }, 1);
-    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", { 1920, 1080 }, 1);
+    
+    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, "Staging Data Pass", { 1920, 1080 }, 1, 0);
+    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool, pipeline2, "Texture Input Pass", { 1920, 1080 }, 2, 0);
+    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", { 1920, 1080 }, 1, 0);
     renderpass2[0]->AddDependency(*renderpass1[0]);
-    renderpass3[0]->AddDependency(*renderpass2[0]);
+    renderpass2[1]->AddDependency(*renderpass2[0]);
+    renderpass3[0]->AddDependency(*renderpass2[1]);
     
     std::vector<TinyVertex> triangles = {
         TinyVertex({0.0f,0.0f}, {240.0f,135.0f,               0.0f}, {1.0f,0.0f,0.0f,1.0f}),
@@ -60,7 +61,7 @@ int TINY_ENGINE_WINDOWMAIN {
         writeCmdBuffers.push_back(cmdbuffer.first);
     }));
     
-    renderpass2[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
+    auto texturePassCallback = TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
         auto cmdbuffer = renderpass.BeginRecordCmdBuffer();
             if (frameResized)
                 camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
@@ -70,7 +71,10 @@ int TINY_ENGINE_WINDOWMAIN {
             renderpass.CmdDrawGeometry(cmdbuffer, true, 1, indices.size());
         renderpass.EndRecordCmdBuffer(cmdbuffer);
         writeCmdBuffers.push_back(cmdbuffer.first);
-    }));
+    });
+
+    renderpass2[0]->onRender.hook(texturePassCallback);
+    renderpass2[1]->onRender.hook(texturePassCallback);
 
     renderpass3[0]->onRender.hook(TinyCallback<TinyRenderPass&, TinyCommandPool&, std::vector<VkCommandBuffer>&, bool>([&](TinyRenderPass& renderpass, TinyCommandPool& commandPool, std::vector<VkCommandBuffer>& writeCmdBuffers, bool frameResized) {
         camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0, 0, 1.0, 0.0);
@@ -95,7 +99,7 @@ int TINY_ENGINE_WINDOWMAIN {
                     for(TinyRenderPass* pass : graph.renderPasses) {
                         std::vector<float> timestamps = pass->QueryTimeStamps();
                         for(float time : timestamps)
-                            std::cout << "[" << graph.frameCounter << "] " << pass->title << " : " << time << " ms" << std::endl;
+                            std::cout << "[" << graph.frameCounter << "] " << pass->subpassIndex << " : " << pass->title << " - " << time << " ms" << std::endl;
                     }
             #endif
         }

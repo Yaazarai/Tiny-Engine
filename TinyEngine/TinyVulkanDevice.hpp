@@ -72,7 +72,7 @@
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				
 				#if TINY_ENGINE_VALIDATION
-				useTimestampBit = false;
+					useTimestampBit = false;
 				#endif
 				initialized = Initialize();
 			}
