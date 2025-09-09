@@ -3,7 +3,7 @@
 :: Note the extra   (space) at the beginning of each new-line to separate parameters when combined into one line during execution.
 :: 
 clang-cl^
- /D _RELEASE^
+ /D _RELEASE_CONSOLE^
  /D _CRT_SECURE_NO_WARNINGS^
  /std:c++20^
  /MP^
@@ -18,11 +18,11 @@ clang-cl^
  /I "%CD%"^
  /I "%GLFW%/include/"^
  /I "%VULKAN%/Include/"^
- /Fe:"%CD%/x64/RELEASE/"^
+ /Fe:"%CD%/x64/PRODTEST/"^
  *.cpp^
  /link^
  /opt:ref^
- /subsystem:windows^
+ /subsystem:console^
  shell32.lib^
  gdi32.lib^
  user32.lib^

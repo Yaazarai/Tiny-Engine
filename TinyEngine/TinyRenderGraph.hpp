@@ -245,7 +245,7 @@
 				vkDestroySemaphore(vkdevice.logicalDevice, swapImageTimeline, VK_NULL_HANDLE);
 			}
 
-			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window) : vkdevice(vkdevice), window(window), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
+			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window, TinySurfaceSupporter swapChainPresentDetails = TinySurfaceSupporter()) : vkdevice(vkdevice), window(window), swapChainPresentDetails(swapChainPresentDetails), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
 			}
@@ -273,9 +273,6 @@
 						break;
 					}
 					#endif
-
-					if (i > 0)
-						subpasses[i]->AddDependency(*subpasses[i - 1]);
 				}
 				return subpasses;
 			}
