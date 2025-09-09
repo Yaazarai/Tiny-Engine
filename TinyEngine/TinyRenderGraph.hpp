@@ -18,6 +18,8 @@
 			VkFence renderPassSignal;
 			VkDeviceSize timelineWait;
 			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
+			VkQueryPool timestampQueryPool = VK_NULL_HANDLE;
+			uint32_t maxTimestamps, timestampIterator;
 			
 			TinyRenderPass operator=(const TinyRenderPass&) = delete;
 			TinyRenderPass(const TinyRenderPass&) = delete;
@@ -25,10 +27,11 @@
             
 			void Disposable(bool waitIdle) {
 				if (targetImage != VK_NULL_HANDLE) delete targetImage;
+				if (timestampQueryPool != VK_NULL_HANDLE) vkDestroyQueryPool(vkdevice.logicalDevice, timestampQueryPool, VK_NULL_HANDLE);
 			}
 
-			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkDeviceSize subpassIndex, VkExtent2D subpassExtent)
-			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), timelineWait(0) {
+			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkDeviceSize subpassIndex, VkExtent2D subpassExtent, uint32_t maxTimestamps = 16U)
+			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), timelineWait(0), timestampIterator(0), maxTimestamps(2U * maxTimestamps * vkdevice.useTimestampBit) {
 				if (pipeline.createInfo.type == TinyPipelineType::TYPE_GRAPHICS || pipeline.createInfo.type == TinyPipelineType::TYPE_COMPUTE) {
 					targetImage = new TinyImage(vkdevice, TinyImageType::TYPE_COLORATTACHMENT, subpassExtent.width, subpassExtent.height, pipeline.createInfo.imageFormat, pipeline.createInfo.addressMode, pipeline.createInfo.interpolation);
 					targetImage->Initialize();
@@ -36,6 +39,11 @@
 
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = VK_SUCCESS;
+
+				if (vkdevice.useTimestampBit) {
+					VkQueryPoolCreateInfo queryCreateInfo = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2U * maxTimestamps * vkdevice.useTimestampBit, .flags = 0 };
+					vkCreateQueryPool(vkdevice.logicalDevice, &queryCreateInfo, VK_NULL_HANDLE, &timestampQueryPool);
+				}
 			}
 
 			VkResult AddDependency(TinyRenderPass& dependency) {
@@ -52,6 +60,22 @@
 				return VK_SUCCESS;
 			}
 
+			std::vector<float> QueryTimeStamps() {
+				std::vector<float> frametimes;
+				#if TINY_ENGINE_VALIDATION
+					if (vkdevice.useTimestampBit && timestampIterator > 0) {
+						std::vector<VkDeviceSize> timestamps(timestampIterator);
+						vkGetQueryPoolResults(vkdevice.logicalDevice, timestampQueryPool, 0, timestamps.size(), timestamps.size() * sizeof(VkDeviceSize), timestamps.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_64_BIT);
+						
+						for(int i = 0; i < timestampIterator; i += 2) {
+							float deltams = float(timestamps[i+1] - timestamps[i]) * (vkdevice.deviceProperties.properties.limits.timestampPeriod / 1000000.0f);
+							frametimes.push_back(deltams);
+						}
+					}
+				#endif
+				return frametimes;
+			}
+			
 			void PushConstants(std::pair<VkCommandBuffer,int32_t> bufferIndexPair, TinyShaderStages shaderFlags, uint32_t byteSize, const void* pValues) {
 				vkCmdPushConstants(bufferIndexPair.first, pipeline.layout, (VkShaderStageFlagBits) shaderFlags, 0, byteSize, pValues);
 			}
@@ -71,7 +95,13 @@
 					cmdPool.ReturnBuffer(bufferIndexPair);
 					return std::pair(VK_NULL_HANDLE, -1);
 				}
-                
+				
+				if (vkdevice.useTimestampBit) {
+					vkCmdResetQueryPool(bufferIndexPair.first, timestampQueryPool, timestampIterator, 2);
+					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
+					timestampIterator ++;
+				}
+
                 targetImage->TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_COLOR_ATTACHMENT);
 
 				VkViewport dynamicViewportKHR { .x = 0, .y = 0, .minDepth = 0.0f, .maxDepth = 1.0f, .width = static_cast<float>(targetImage->width), .height = static_cast<float>(targetImage->height) };
@@ -100,6 +130,12 @@
 				targetImage->TransitionLayoutBarrier(bufferIndexPair.first, TinyCmdBufferSubmitStage::STAGE_END,
 					(targetImage->imageType == TinyImageType::TYPE_SWAPCHAIN)?
 						TinyImageLayout::LAYOUT_PRESENT_SRC : TinyImageLayout::LAYOUT_SHADER_READONLY);
+						
+				if (vkdevice.useTimestampBit) {
+					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
+					timestampIterator ++;
+				}
+
 				vkEndCommandBuffer(bufferIndexPair.first);
 			}
         
@@ -107,10 +143,21 @@
 				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = cmdPool.LeaseBuffer(false);
 				VkCommandBufferBeginInfo beginInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT };
 				vkBeginCommandBuffer(bufferIndexPair.first, &beginInfo);
+				if (vkdevice.useTimestampBit) {
+					vkCmdResetQueryPool(bufferIndexPair.first, timestampQueryPool, timestampIterator, 2);
+					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
+					timestampIterator ++;
+				}
+
 				return bufferIndexPair;
 			}
 
 			void EndStageCmdBuffer(std::pair<VkCommandBuffer, int32_t> bufferIndexPair) {
+				if (vkdevice.useTimestampBit) {
+					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
+					timestampIterator ++;
+				}
+
 				vkEndCommandBuffer(bufferIndexPair.first);
 			}
 			
@@ -198,25 +245,25 @@
 				vkDestroySemaphore(vkdevice.logicalDevice, swapImageTimeline, VK_NULL_HANDLE);
 			}
 
-			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window) : vkdevice(vkdevice), window(window), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
+			TinyRenderGraph(TinyVkDevice& vkdevice, TinyWindow* window, TinySurfaceSupporter swapChainPresentDetails = TinySurfaceSupporter()) : vkdevice(vkdevice), window(window), swapChainPresentDetails(swapChainPresentDetails), presentable(true), refreshable(false), frameResized(false), swapChain(VK_NULL_HANDLE), renderPassCounter(0), frameCounter(0), swapFrameIndex(0) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
 			}
 			
-			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkExtent2D extent, VkDeviceSize subpassCount = 1) {
+			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkExtent2D extent, VkDeviceSize subpassCount = 1, uint32_t maxTimestamps = 16U) {
 				std::vector<TinyRenderPass*> subpasses;
 				for(int32_t i = 0; i < std::max(1, static_cast<int32_t>(subpassCount)); i++) {
-					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extent);
+					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extent, maxTimestamps);
 					renderPasses.push_back(renderpass);
 					subpasses.push_back(renderpass);
                     
 					#if TINY_ENGINE_VALIDATION
 					switch(renderpass->pipeline.createInfo.type) {
 						case TinyPipelineType::TYPE_GRAPHICS:
-						std::cout << "TinyEngine: Created graphics render pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
+						std::cout << "TinyEngine: Created graphics pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
 						break;
 						case TinyPipelineType::TYPE_PRESENT:
-						std::cout << "TinyEngine: Created present render pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
+						std::cout << "TinyEngine: Created present pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
 						break;
 						case TinyPipelineType::TYPE_COMPUTE:
 						std::cout << "TinyEngine: Created compute only pass [" << (renderPassCounter - 1) << ", " << renderpass->title << "]" << std::endl;
@@ -226,9 +273,6 @@
 						break;
 					}
 					#endif
-
-					if (i > 0)
-						subpasses[i]->AddDependency(*subpasses[i - 1]);
 				}
 				return subpasses;
 			}
@@ -252,8 +296,10 @@
 			}
 			
 			VkResult ExecuteRenderGraph() {
-				for(int32_t i = 0; i < renderPasses.size(); i++)
-					renderPasses[i]->cmdPool.ReturnAllBuffers();
+				for(TinyRenderPass* pass : renderPasses) {
+					pass->cmdPool.ReturnAllBuffers();
+					pass->timestampIterator = 0;
+				}
 				
 				VkResult result = VK_SUCCESS;
 				for(int32_t i = 0; i < renderPasses.size(); i++) {
@@ -307,17 +353,18 @@
 					TinySwapchain::WaitResetFences(vkdevice, &swapImageInFlight);
 					VkResult result = TinySwapchain::QueryNextSwapChainImage(vkdevice, swapChain, swapFrameIndex, swapImageInFlight, swapImageAvailable);
 					TinySwapchain::WaitResetFences(vkdevice, &swapImageInFlight);
-
+					
 					if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 						result = ExecuteRenderGraph();
 					
 					if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR)
 						result = TinySwapchain::QueuePresent(swapChainPresentQueue, swapChain, swapImageFinished, swapFrameIndex);
-
+					
 					presentable = (result == VK_SUCCESS);
 					frameResized = false;
 					frameCounter ++;
 				}
+
 				return result;
 			}
 			

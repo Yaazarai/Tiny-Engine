@@ -41,6 +41,7 @@
 			TinyWindow* window = VK_NULL_HANDLE;
 			VkSurfaceKHR presentSurface = VK_NULL_HANDLE;
 			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
+			VkPhysicalDeviceProperties2 deviceProperties = {};
 
 			/// @brief Remove default copy destructor.
 			TinyVkDevice(const TinyVkDevice&) = delete;
@@ -69,6 +70,10 @@
 			TinyVkDevice(bool useGraphicsBit = true, bool usePresentBit = false, bool useComputeBit = false, bool useTimestampBit = false, TinyWindow* window = VK_NULL_HANDLE, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE })
 			: window(window), useGraphicsBit(useGraphicsBit), usePresentBit(usePresentBit), useComputeBit(useComputeBit), useTimestampBit(useTimestampBit), deviceFeatures(deviceFeatures) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
+				
+				#if TINY_ENGINE_VALIDATION
+					useTimestampBit = false;
+				#endif
 				initialized = Initialize();
 			}
 
@@ -88,10 +93,10 @@
 				for (int i = 0; i < queueFamilies.size(); i++) {
 					VkBool32 presentSupport = false;
 					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, presentSurface, &presentSupport);
-
-					if (useGraphicsBit && !indices.hasGraphicsFamily && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
-					if (usePresentBit && !indices.hasPresentFamily && presentSupport && queueFamilies[i].timestampValidBits > 0) { indices.SetPresentFamily(i); useOutputBits --; }
-					if (useComputeBit && !indices.hasComputeFamily && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && queueFamilies[i].timestampValidBits > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
+					VkBool32 timestampSupport = (useTimestampBit)? queueFamilies[i].timestampValidBits : 1;
+					if (useGraphicsBit && !indices.hasGraphicsFamily && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && timestampSupport > 0) { indices.SetGraphicsFamily(i); useOutputBits --; }
+					if (usePresentBit && !indices.hasPresentFamily && presentSupport && timestampSupport > 0) { indices.SetPresentFamily(i); useOutputBits --; }
+					if (useComputeBit && !indices.hasComputeFamily && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT && timestampSupport > 0) { indices.SetComputeFamily(i); useOutputBits --; }
 					if (useOutputBits <= 0) break;
 				}
 				return indices;
@@ -119,7 +124,7 @@
 				
 				#if TINY_ENGINE_VALIDATION
 					VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties = defaultPushDescriptorProperties;
-					VkPhysicalDeviceProperties2 deviceProperties { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &pushDescriptorProperties };
+					deviceProperties = { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &pushDescriptorProperties };
 					vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties);
 					TinyQueueFamily indices = QueryPhysicalDeviceQueueFamilies(physicalDevice);
 					std::cout << "TinyEngine: GPU Device Info" << std::endl;
@@ -167,7 +172,9 @@
 				if (window != VK_NULL_HANDLE)
 					presentSurface = window->CreateWindowSurface(instance);	
 				
-				result = CreateDebugUtilsMessengerEXT(instance, &defaultDebugCreateInfo, VK_NULL_HANDLE, &debugMessenger);
+				#if TINY_ENGINE_VALIDATION
+					result = CreateDebugUtilsMessengerEXT(instance, &defaultDebugCreateInfo, VK_NULL_HANDLE, &debugMessenger);
+				#endif
 				return result;
 			}
 
@@ -209,7 +216,7 @@
 						for (const auto& extension : deviceExtensions) std::cout << '\t' << extension << std::endl;
 					}
 				#endif
-
+				
 				VmaAllocatorCreateInfo allocatorCreateInfo { .vulkanApiVersion = TINY_ENGINE_VERSION, .physicalDevice = physicalDevice, .device = logicalDevice, .instance = instance };
 				return vmaCreateAllocator(&allocatorCreateInfo, &memoryAllocator);
 			}

@@ -113,7 +113,7 @@
 
 				swapChainImages.resize(imageCount);
 				for(uint32_t i = 0; i < imageCount; i++) {
-					swapChainImages[i] = new TinyImage(vkdevice, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, VK_FORMAT_B8G8R8A8_UNORM , VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE);
+					swapChainImages[i] = new TinyImage(vkdevice, TinyImageType::TYPE_SWAPCHAIN, extent.width, extent.height, presentDetails.dataFormat, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, false, newSwapImages[i], VK_NULL_HANDLE, VK_NULL_HANDLE);
 					swapChainImages[i]->Initialize();
 				}
 				
