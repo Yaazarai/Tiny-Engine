@@ -9,10 +9,8 @@
 		public:
 			TinyVkDevice& vkdevice;
 			VkCommandPool commandPool;
-			const bool useAsComputeCommandPool;
 			size_t bufferCount;
 			std::vector<std::pair<VkCommandBuffer, VkBool32>> commandBuffers;
-			static const size_t defaultCommandPoolSize = 32UL;
 			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 
 			/// @brief Remove default copy destructor.
@@ -31,12 +29,12 @@
 			}
 			
 			/// @brief Creates a command pool to lease VkCommandBuffers from for recording render commands.
-			TinyCommandPool(TinyVkDevice& vkdevice, bool useAsComputeCommandPool, size_t bufferCount = defaultCommandPoolSize) : vkdevice(vkdevice), useAsComputeCommandPool(useAsComputeCommandPool), bufferCount(bufferCount) {
+			TinyCommandPool(TinyVkDevice& vkdevice, size_t bufferCount = 32UL) : vkdevice(vkdevice), bufferCount(bufferCount) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
 			}
 
-			/// @brief Creates the underlyign command pool with: VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT enabled.
+			/// @brief Creates the underlying command pool with: VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT enabled.
 			VkResult CreateCommandPool() {
 				VkCommandPoolCreateInfo poolInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT };
 				TinyQueueFamily queueFamily = vkdevice.QueryPhysicalDeviceQueueFamilies();
@@ -46,7 +44,7 @@
 
 				VkResult result = (!queueFamily.hasGraphicsFamily)? VK_ERROR_INITIALIZATION_FAILED : VK_SUCCESS;
 				if (result == VK_SUCCESS)
-                    result = vkCreateCommandPool(vkdevice.logicalDevice, &poolInfo, VK_NULL_HANDLE, &commandPool);
+					result = vkCreateCommandPool(vkdevice.logicalDevice, &poolInfo, VK_NULL_HANDLE, &commandPool);
                 return result;
 			}
 
@@ -63,10 +61,7 @@
 				VkResult result = vkAllocateCommandBuffers(vkdevice.logicalDevice, &allocInfo, temporary.data());
 
 				if (result == VK_SUCCESS)
-					std::for_each(temporary.begin(), temporary.end(), [&buffers = commandBuffers](VkCommandBuffer cmdBuffer) {
-						buffers.push_back(std::pair(cmdBuffer, static_cast<VkBool32>(false)));
-					});
-
+					std::for_each(temporary.begin(), temporary.end(), [&buffers = commandBuffers](VkCommandBuffer cmdBuffer) { buffers.push_back(std::pair(cmdBuffer, static_cast<VkBool32>(false))); });
                 return result;
 			}
             
@@ -74,7 +69,6 @@
 			bool HasBuffers() {
 				for (auto& cmdBuffer : commandBuffers)
 					if (!cmdBuffer.second) return true;
-
 				return false;
 			}
 
@@ -96,7 +90,6 @@
                             vkResetCommandBuffer(cmdBuffer.first, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
 						return std::pair(cmdBuffer.first, index++);
 					}
-				
 				return std::pair<VkCommandBuffer,int32_t>(VK_NULL_HANDLE,-1);
 			}
 
@@ -112,18 +105,15 @@
 			/// @brief Sets all of the command buffers to available--optionally resets their recorded commands.
 			VkResult ReturnAllBuffers() {
 				VkResult result = vkResetCommandPool(vkdevice.logicalDevice, commandPool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
-				if (result == VK_SUCCESS)
-					for(auto& cmdBuffer : commandBuffers)
-                    	cmdBuffer.second = false;
+				if (result == VK_SUCCESS) for(auto& cmdBuffer : commandBuffers) cmdBuffer.second = false;
                 return result;
 			}
 
-			/// @brief Creates the CommandPool & CommandBuffers for submitting rendering/compute commands.
+			/// @brief Creates the CommandPool & CommandBuffers for submitting rendering commands.
 			VkResult Initialize() {
                 VkResult result = CreateCommandPool();
-                if (result == VK_SUCCESS)
-                    result = CreateCommandBuffers(bufferCount);
-                return result;
+                if (result != VK_SUCCESS) return result;
+                return CreateCommandBuffers(bufferCount);
             }
 		};
 	}

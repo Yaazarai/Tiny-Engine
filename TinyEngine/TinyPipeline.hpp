@@ -71,10 +71,6 @@
 				return { {vertex, fragment}, TinyPipelineType::TYPE_PRESENT, blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
 			}
 
-			static TinyPipelineCreateInfo ComputeInfo(TinyShader compute) {
-				return { {compute}, TinyPipelineType::TYPE_COMPUTE, true, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
-			}
-
 			static TinyPipelineCreateInfo TransferInfo() {
 				return { {}, TinyPipelineType::TYPE_TRANSFER, true, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
 			}
@@ -93,12 +89,12 @@
 			TinyPipeline operator=(const TinyPipeline&) = delete;
 			TinyPipeline(const TinyPipeline&) = delete;
 			~TinyPipeline() { this->Dispose(); }
-
+			
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkQueueWaitIdle(submitQueue);
-				vkDestroyDescriptorSetLayout(vkdevice.logicalDevice, descriptorLayout, VK_NULL_HANDLE);
-				vkDestroyPipeline(vkdevice.logicalDevice, pipeline, VK_NULL_HANDLE);
-				vkDestroyPipelineLayout(vkdevice.logicalDevice, layout, VK_NULL_HANDLE);
+				if (waitIdle) { vkQueueWaitIdle(submitQueue); vkdevice.DeviceWaitIdle(); }
+				if (descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(vkdevice.logicalDevice, descriptorLayout, VK_NULL_HANDLE);
+				if (pipeline != VK_NULL_HANDLE) vkDestroyPipeline(vkdevice.logicalDevice, pipeline, VK_NULL_HANDLE);
+				if (layout != VK_NULL_HANDLE) vkDestroyPipelineLayout(vkdevice.logicalDevice, layout, VK_NULL_HANDLE);
 			}
 
 			TinyPipeline(TinyVkDevice& vkdevice, TinyPipelineCreateInfo createInfo)
@@ -135,7 +131,7 @@
 			
 			VkResult Initialize() {
 				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
-				if (!indices.hasGraphicsFamily && !indices.hasPresentFamily && !indices.hasComputeFamily) return VK_ERROR_INITIALIZATION_FAILED;
+				if (!indices.hasGraphicsFamily && !indices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
 				
 				switch(createInfo.type) {
 					case TinyPipelineType::TYPE_GRAPHICS:
@@ -145,14 +141,15 @@
 					case TinyPipelineType::TYPE_PRESENT:
 						vkGetDeviceQueue(vkdevice.logicalDevice, indices.presentFamily, 0, &submitQueue);
 					break;
-					case TinyPipelineType::TYPE_COMPUTE:
-						vkGetDeviceQueue(vkdevice.logicalDevice, indices.computeFamily, 0, &submitQueue);
-					break;
 				}
 
 				VkResult result = VK_SUCCESS;
-				if (createInfo.type == TinyPipelineType::TYPE_TRANSFER)
+				if (createInfo.type == TinyPipelineType::TYPE_TRANSFER) {
+					#if TINY_ENGINE_VALIDATION
+						std::cout << "TinyEngine: Created transfer / staging pipeline." << std::endl;
+					#endif
 					return result;
+				}
 
 				std::vector<VkPipelineShaderStageCreateInfo> shaderPipelineCreateInfo;
 				std::vector<VkShaderModule> shaderModules;
@@ -187,20 +184,14 @@
 						vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(createInfo.vertexDescription.attributes.size());
 					VkPipelineInputAssemblyStateCreateInfo inputAssembly = defaultInputAssembly;
 						inputAssembly.topology = createInfo.vertexTopology;
-					VkPipelineViewportStateCreateInfo viewportState = defaultViewportState;
 					VkPipelineRasterizationStateCreateInfo rasterizer = defaultRasterizer;
 						rasterizer.polygonMode = createInfo.polygonTopology;
-					VkPipelineMultisampleStateCreateInfo multisampling = defaultMultisampling;
 					VkPipelineColorBlendAttachmentState colorBlendState = defaultColorBlendState;
 						colorBlendState.blendEnable = createInfo.blending;
 					VkPipelineColorBlendStateCreateInfo colorBlending = defaultColorBlending;
 						colorBlending.pAttachments = &colorBlendState;
-					VkPipelineDynamicStateCreateInfo dynamicState = defaultDynamicState;
 					VkPipelineRenderingCreateInfoKHR renderingCreateInfo = defaultRenderingCreateInfo;
 						renderingCreateInfo.pColorAttachmentFormats = &createInfo.imageFormat;
-					VkPipelineDepthStencilStateCreateInfo depthStencilInfo = defaultDepthStencilInfo;
-						depthStencilInfo.depthTestEnable = VK_FALSE;
-						depthStencilInfo.depthWriteEnable = VK_FALSE;
 					
 					VkPipelineLayoutCreateInfo pipelineLayoutInfo {
 						.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -217,39 +208,32 @@
 						.layout = layout,
 						.pVertexInputState = &vertexInputInfo,
 						.pInputAssemblyState = &inputAssembly,
-						.pViewportState = &viewportState,
+						.pViewportState = &defaultViewportState,
 						.pRasterizationState = &rasterizer,
-						.pMultisampleState = &multisampling,
+						.pMultisampleState = &defaultMultisampling,
 						.pColorBlendState = &colorBlending,
-						.pDepthStencilState = &depthStencilInfo,
-						.pDynamicState = &dynamicState,
+						.pDepthStencilState = &defaultDepthStencilInfo,
+						.pDynamicState = &defaultDynamicState,
 						.pNext = &renderingCreateInfo,
 						.renderPass = VK_NULL_HANDLE, .subpass = 0,
-						.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
-					};
-					
-					VkComputePipelineCreateInfo computePipelineInfo {
-						.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-						.stage = shaderPipelineCreateInfo[0],
-						.layout = layout,
 						.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
 					};
 
 					switch(createInfo.type) {
 						case TinyPipelineType::TYPE_GRAPHICS:
+							result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, VK_NULL_HANDLE, &pipeline);
+							#if TINY_ENGINE_VALIDATION
+								std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
+							#endif
+						break;
 						case TinyPipelineType::TYPE_PRESENT:
 							result = vkCreateGraphicsPipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineInfo, VK_NULL_HANDLE, &pipeline);
+							#if TINY_ENGINE_VALIDATION
+								std::cout << "TinyEngine: Created present render pipeline." << std::endl;
+							#endif
 						break;
-						case TinyPipelineType::TYPE_COMPUTE:
-							result = vkCreateComputePipelines(vkdevice.logicalDevice, VK_NULL_HANDLE, 1, &computePipelineInfo, VK_NULL_HANDLE, &pipeline);
-						break;
-						case TinyPipelineType::TYPE_TRANSFER:
-						break;
+						default: break;
 					}
-					
-					#if TINY_ENGINE_VALIDATION
-						std::cout << "TinyEngine: Created graphics render pipeline." << std::endl;
-					#endif
 				}
 
 				for(auto shaderModule : shaderModules)

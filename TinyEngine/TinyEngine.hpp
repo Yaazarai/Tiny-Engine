@@ -103,11 +103,6 @@
     #include <utility>
     #include <type_traits>
 
-    /// 
-    /// Image Encoding / Decoding (using QOI: Quite Okay Image "Format").
-    /// 
-    #include "./Libraries/QuiteOkayImageFormat.h"
-
     #pragma region BACKEND_SYSTEMS
         #include "./Utilities/TinyEnums.hpp"
         #include "./Utilities/TinyTimedGuard.hpp"

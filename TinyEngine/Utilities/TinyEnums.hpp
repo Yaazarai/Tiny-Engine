@@ -4,10 +4,9 @@
 	#include "./TinyEngine.hpp"
 
 	namespace TINY_ENGINE_NAMESPACE {
-		/// Specifies the pipeline type (Graphics/Present, Compute or Transfer--no pipeline).
+		/// Specifies the pipeline type (Graphics/Present or Transfer--no pipeline).
 		enum TinyPipelineType {
 			TYPE_GRAPHICS,
-			TYPE_COMPUTE,
 			TYPE_PRESENT,
 			TYPE_TRANSFER
 		};
@@ -17,21 +16,15 @@
 			/// @brief Vertex (Point) stage pre-rasterization.
 			STAGE_VERTEX = VK_SHADER_STAGE_VERTEX_BIT,
 			/// @brief Fragment (Pixel) stage post-rasterization.
-			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT,
-			/// @brief Compute stage (non-rendering).
-			STAGE_COMPUTE = VK_SHADER_STAGE_COMPUTE_BIT
+			STAGE_FRAGMENT = VK_SHADER_STAGE_FRAGMENT_BIT
 		};
 		
 		/// Specifies tghe object type we're sending to our shader: image, buffer, etc.
 		enum TinyDescriptorType {
 			/// @brief Read-Only image type for shader samplers.
 			TYPE_IMAGE_SAMPLER = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			/// @brief Read/Write image type for compute shaders.
-			TYPE_STORAGE_IMAGE = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
 			/// @brief Read-Only buffer type for shader samplers.
 			TYPE_UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			/// @brief Read/Write buffer type for compute shaders.
-			TYPE_STORAGE_BUFFER = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
 		};
 
 		/// Descriptor binding indices/values.
@@ -59,9 +52,7 @@
 			/// @brief For writing VkIndirectCommand's to a buffer for Indirect drawing.
 			TYPE_INDIRECT,
 			/// @brief For tranfering CPU bound buffer data to the GPU.
-			TYPE_STAGING,
-			/// @brief For writing data from fragment/compute shaders.
-			TYPE_STORAGE
+			TYPE_STAGING
 		};
 
 		/// @brief Image-Layout for rendering operations.
@@ -78,8 +69,6 @@
 			LAYOUT_COLOR_ATTACHMENT = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			/// @brief Generic layout for read OR write in shaders.
 			LAYOUT_GENERAL = VK_IMAGE_LAYOUT_GENERAL,
-			/// @brief Generic layout for read OR write in shaders.
-			LAYOUT_STORAGE = VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT,
 			/// @brief Presentation layout for displaying on screen.
 			LAYOUT_PRESENT_SRC = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 		};
@@ -90,8 +79,6 @@
 			TYPE_SWAPCHAIN,
 			/// @brief For writing to VkImage via Fragment shaders.
 			TYPE_COLORATTACHMENT,
-			/// @brief For reading/writing directly from/to VkImage via shaders.
-			TYPE_STORAGE,
 			/// @brief For reading within shaders only.
 			TYPE_SHADER_READONLY
 		};
