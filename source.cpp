@@ -7,7 +7,7 @@ using namespace tny;
 
 int TINY_ENGINE_WINDOWMAIN {
     TinyWindow window("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
-    TinyVkDevice vkdevice(false, &window);
+    TinyVkDevice vkdevice(&window);
     TinyCommandPool cmdpool(vkdevice);
 
     TinyShader vertexShader(TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER, { sizeof(glm::mat4) }, {});
@@ -92,13 +92,12 @@ int TINY_ENGINE_WINDOWMAIN {
         renderpass.EndRecordCmdBuffer(cmdbuffer);
         writeCmdBuffers.push_back(cmdbuffer.first);
     }));
-
+    
     std::thread mythread([&window, &graph, &vkdevice]() {
         while (window.ShouldExecute()) {
             graph.RenderSwapChain();
-            
             #if TINY_ENGINE_VALIDATION
-                if (vkdevice.useTimestampBit)
+                if (TINY_ENGINE_VALIDATION)
                     for(TinyRenderPass* pass : graph.renderPasses) {
                         std::vector<float> timestamps = pass->QueryTimeStamps();
                         
@@ -114,6 +113,6 @@ int TINY_ENGINE_WINDOWMAIN {
     window.WhileMain(TinyWindowEvents::WAIT_EVENTS);
     
     mythread.join();
-    vkdevice.DeviceWaitIdle();
+    vkDeviceWaitIdle(vkdevice.logicalDevice);
     return VK_SUCCESS;
 };

@@ -26,7 +26,7 @@
 			~TinyImage() { this->Dispose(); }
 
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkdevice.DeviceWaitIdle();
+				if (waitIdle) vkDeviceWaitIdle(vkdevice.logicalDevice);
 				if (imageType != TinyImageType::TYPE_SWAPCHAIN) {
 					if (imageSampler != VK_NULL_HANDLE) vkDestroySampler(vkdevice.logicalDevice, imageSampler, VK_NULL_HANDLE);
 					if (imageView != VK_NULL_HANDLE) vkDestroyImageView(vkdevice.logicalDevice, imageView, VK_NULL_HANDLE);
@@ -41,8 +41,7 @@
             }
 
             VkResult CreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false) {
-				if (type == TinyImageType::TYPE_SWAPCHAIN)
-					return VK_ERROR_INITIALIZATION_FAILED;
+				if (type == TinyImageType::TYPE_SWAPCHAIN) return VK_ERROR_INITIALIZATION_FAILED;
 
 				VkImageCreateInfo imgCreateInfo = {
 					.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,

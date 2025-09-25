@@ -7,8 +7,7 @@
 		class TinyWindow : public TinyDisposable {
 		public:
             bool hwndResizable, hwndMinSize, hwndTransparent, hwndBordered, hwndFullscreen;
-			int hwndWidth, hwndHeight, hwndXpos, hwndYpos;
-            int minWidth, minHeight;
+			int hwndWidth, hwndHeight, hwndXpos, hwndYpos, minWidth, minHeight;
             std::string hwndTitle;
 			VkResult initialized = VK_ERROR_INITIALIZATION_FAILED;
 			

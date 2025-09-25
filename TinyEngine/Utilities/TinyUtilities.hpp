@@ -7,23 +7,32 @@
 		#pragma region VULKAN_DEBUG_UTILITIES
 
 		VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+			#if TINY_ENGINE_VALIDATION
 			auto create = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 			if (create != VK_NULL_HANDLE)
 				return create(instance, pCreateInfo, pAllocator, pDebugMessenger);
 			return VK_ERROR_INITIALIZATION_FAILED;
+			#endif
+			return VK_SUCCESS;
 		}
 
 		VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
+			#if TINY_ENGINE_VALIDATION
 			auto destroy = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 			destroy(instance, debugMessenger, pAllocator);
 			if (destroy != VK_NULL_HANDLE)
 				return VK_SUCCESS;
 			return VK_ERROR_INITIALIZATION_FAILED;
+			#endif
+			return VK_SUCCESS;
 		}
 
 		VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+			#if TINY_ENGINE_VALIDATION
 			std::cout << "TinyEngine: Validation Layer: " << pCallbackData->pMessage << std::endl;
 			return (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)? VK_TRUE : VK_FALSE;
+			#endif
+			return VK_FALSE;
 		}
 
 		#pragma endregion

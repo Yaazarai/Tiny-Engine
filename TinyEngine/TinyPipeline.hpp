@@ -91,7 +91,7 @@
 			~TinyPipeline() { this->Dispose(); }
 			
 			void Disposable(bool waitIdle) {
-				if (waitIdle) { vkQueueWaitIdle(submitQueue); vkdevice.DeviceWaitIdle(); }
+				if (waitIdle) { vkQueueWaitIdle(submitQueue); vkDeviceWaitIdle(vkdevice.logicalDevice); }
 				if (descriptorLayout != VK_NULL_HANDLE) vkDestroyDescriptorSetLayout(vkdevice.logicalDevice, descriptorLayout, VK_NULL_HANDLE);
 				if (pipeline != VK_NULL_HANDLE) vkDestroyPipeline(vkdevice.logicalDevice, pipeline, VK_NULL_HANDLE);
 				if (layout != VK_NULL_HANDLE) vkDestroyPipelineLayout(vkdevice.logicalDevice, layout, VK_NULL_HANDLE);
@@ -130,16 +130,15 @@
 			}
 			
 			VkResult Initialize() {
-				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
-				if (!indices.hasGraphicsFamily && !indices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
+				if (!vkdevice.queueFamilyIndices.hasGraphicsFamily && !vkdevice.queueFamilyIndices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
 				
 				switch(createInfo.type) {
 					case TinyPipelineType::TYPE_GRAPHICS:
 					case TinyPipelineType::TYPE_TRANSFER:
-						vkGetDeviceQueue(vkdevice.logicalDevice, indices.graphicsFamily, 0, &submitQueue);
+						vkGetDeviceQueue(vkdevice.logicalDevice, vkdevice.queueFamilyIndices.graphicsFamily, 0, &submitQueue);
 					break;
 					case TinyPipelineType::TYPE_PRESENT:
-						vkGetDeviceQueue(vkdevice.logicalDevice, indices.presentFamily, 0, &submitQueue);
+						vkGetDeviceQueue(vkdevice.logicalDevice, vkdevice.queueFamilyIndices.presentFamily, 0, &submitQueue);
 					break;
 				}
 

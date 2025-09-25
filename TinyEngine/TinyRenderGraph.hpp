@@ -27,13 +27,13 @@
 			~TinyRenderPass() { this->Dispose(); }
             
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkdevice.DeviceWaitIdle();
+				if (waitIdle) vkDeviceWaitIdle(vkdevice.logicalDevice);
 				if (targetImage != VK_NULL_HANDLE) delete targetImage;
 				if (timestampQueryPool != VK_NULL_HANDLE) vkDestroyQueryPool(vkdevice.logicalDevice, timestampQueryPool, VK_NULL_HANDLE);
 			}
 
 			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkDeviceSize subpassIndex, VkExtent2D subpassExtent, uint32_t maxTimestamps = 16U)
-			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), timelineWait(0), timestampIterator(0), maxTimestamps(2U * maxTimestamps * vkdevice.useTimestampBit) {
+			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), timelineWait(0), timestampIterator(0), maxTimestamps(2U * maxTimestamps * TINY_ENGINE_VALIDATION) {
 				if (pipeline.createInfo.type == TinyPipelineType::TYPE_GRAPHICS) {
 					targetImage = new TinyImage(vkdevice, TinyImageType::TYPE_COLORATTACHMENT, subpassExtent.width, subpassExtent.height, pipeline.createInfo.imageFormat, pipeline.createInfo.addressMode, pipeline.createInfo.interpolation);
 					targetImage->Initialize();
@@ -42,8 +42,8 @@
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = VK_SUCCESS;
 
-				if (vkdevice.useTimestampBit) {
-					VkQueryPoolCreateInfo queryCreateInfo = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2U * maxTimestamps * vkdevice.useTimestampBit, .flags = 0 };
+				if (TINY_ENGINE_VALIDATION) {
+					VkQueryPoolCreateInfo queryCreateInfo = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2U * maxTimestamps * TINY_ENGINE_VALIDATION, .flags = 0 };
 					vkCreateQueryPool(vkdevice.logicalDevice, &queryCreateInfo, VK_NULL_HANDLE, &timestampQueryPool);
 				}
 			}
@@ -65,7 +65,7 @@
 			std::vector<float> QueryTimeStamps() {
 				std::vector<float> frametimes;
 				#if TINY_ENGINE_VALIDATION
-					if (vkdevice.useTimestampBit && timestampIterator > 0) {
+					if (TINY_ENGINE_VALIDATION && timestampIterator > 0) {
 						std::vector<VkDeviceSize> timestamps(timestampIterator);
 						vkGetQueryPoolResults(vkdevice.logicalDevice, timestampQueryPool, 0, timestamps.size(), timestamps.size() * sizeof(VkDeviceSize), timestamps.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_64_BIT);
 						
@@ -98,7 +98,7 @@
 					return std::pair(VK_NULL_HANDLE, -1);
 				}
 				
-				if (vkdevice.useTimestampBit) {
+				if (TINY_ENGINE_VALIDATION) {
 					vkCmdResetQueryPool(bufferIndexPair.first, timestampQueryPool, timestampIterator, 2);
 					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
 					timestampIterator ++;
@@ -133,7 +133,7 @@
 					(targetImage->imageType == TinyImageType::TYPE_SWAPCHAIN)?
 						TinyImageLayout::LAYOUT_PRESENT_SRC : TinyImageLayout::LAYOUT_SHADER_READONLY);
 						
-				if (vkdevice.useTimestampBit) {
+				if (TINY_ENGINE_VALIDATION) {
 					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
 					timestampIterator ++;
 				}
@@ -145,7 +145,7 @@
 				std::pair<VkCommandBuffer, int32_t> bufferIndexPair = cmdPool.LeaseBuffer(false);
 				VkCommandBufferBeginInfo beginInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT };
 				vkBeginCommandBuffer(bufferIndexPair.first, &beginInfo);
-				if (vkdevice.useTimestampBit) {
+				if (TINY_ENGINE_VALIDATION) {
 					vkCmdResetQueryPool(bufferIndexPair.first, timestampQueryPool, timestampIterator, 2);
 					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
 					timestampIterator ++;
@@ -163,7 +163,7 @@
 			}
 			
 			void EndStageCmdBuffer(std::pair<VkCommandBuffer, int32_t> bufferIndexPair) {
-				if (vkdevice.useTimestampBit) {
+				if (TINY_ENGINE_VALIDATION) {
 					vkCmdWriteTimestamp(bufferIndexPair.first, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, timestampQueryPool, timestampIterator);
 					timestampIterator ++;
 				}
@@ -230,7 +230,7 @@
 			~TinyRenderGraph() { this->Dispose(); }
 
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkdevice.DeviceWaitIdle();
+				if (waitIdle) vkDeviceWaitIdle(vkdevice.logicalDevice);
 
 				for(TinyImage* swapImage : swapChainImages) {
 					vkDestroyImageView(vkdevice.logicalDevice, swapImage->imageView, VK_NULL_HANDLE);
@@ -385,10 +385,9 @@
 			
 			VkResult Initialize() {
 				if (window != VK_NULL_HANDLE) {
-					TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
-					if (!indices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
-					vkGetDeviceQueue(vkdevice.logicalDevice, indices.presentFamily, 0, &swapChainPresentQueue);
-
+					if (!vkdevice.queueFamilyIndices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
+					vkGetDeviceQueue(vkdevice.logicalDevice, vkdevice.queueFamilyIndices.presentFamily, 0, &swapChainPresentQueue);
+					
 					TinySwapchain::CreateSwapChainImages(vkdevice, *window, swapChainPresentDetails, swapChain, swapChainImages);
 					TinySwapchain::CreateSwapChainImageViews(vkdevice, swapChainPresentDetails, swapChainImages);
 

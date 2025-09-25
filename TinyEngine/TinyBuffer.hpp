@@ -20,7 +20,7 @@
 			~TinyBuffer() { this->Dispose(); }
 
 			void Disposable(bool waitIdle) {
-				if (waitIdle) vkdevice.DeviceWaitIdle();
+				if (waitIdle) vkDeviceWaitIdle(vkdevice.logicalDevice);
 				vmaDestroyBuffer(vkdevice.memoryAllocator, buffer, memory);
 			}
 
