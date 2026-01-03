@@ -121,11 +121,8 @@
 					.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
 					.pCode = reinterpret_cast<const uint32_t*>(shaderCode.data()), .codeSize = shaderCode.size(), .flags = 0, .pNext = VK_NULL_HANDLE,
 				};
-
 				VkShaderModule shaderModule;
-				if (vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule) != VK_SUCCESS)
-					return VK_NULL_HANDLE;
-
+				vkCreateShaderModule(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &shaderModule);
 				return shaderModule;
 			}
 			
@@ -214,8 +211,7 @@
 						.pDepthStencilState = &defaultDepthStencilInfo,
 						.pDynamicState = &defaultDynamicState,
 						.pNext = &renderingCreateInfo,
-						.renderPass = VK_NULL_HANDLE, .subpass = 0,
-						.basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
+						.renderPass = VK_NULL_HANDLE, .subpass = 0, .basePipelineIndex = -1, .basePipelineHandle = VK_NULL_HANDLE
 					};
 
 					switch(createInfo.type) {

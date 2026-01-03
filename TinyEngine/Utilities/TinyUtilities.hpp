@@ -92,6 +92,16 @@
 		#pragma endregion
         #pragma region VULKAN_INTERFACE SUPPORT
 
+		/// @brief Vulkan Queue Family flags.
+		struct TinyQueueFamily {
+			uint32_t graphicsFamily, presentFamily;
+			bool hasGraphicsFamily, hasPresentFamily;
+
+			TinyQueueFamily() : graphicsFamily(0), presentFamily(0), hasGraphicsFamily(false), hasPresentFamily(false) {}
+			void SetGraphicsFamily(uint32_t queueFamily) { graphicsFamily = queueFamily; hasGraphicsFamily = true; }
+			void SetPresentFamily(uint32_t queueFamily) { presentFamily = queueFamily; hasPresentFamily = true; }
+		};
+
 		/// @brief Description of the SwapChain Rendering format.
 		struct TinySwapChainSupporter {
 		public:
@@ -110,7 +120,15 @@
 
         #pragma endregion
 		#pragma region VULKAN_ENUMERATE_HELPER_FUNCTIONS
-
+		
+		VkDeviceSize QueryPhysicalDeviceRankByHeapSize(VkPhysicalDevice device) {
+			VkPhysicalDeviceMemoryProperties2 memoryProperties { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
+			vkGetPhysicalDeviceMemoryProperties2(device, &memoryProperties);
+			for(VkMemoryHeap heap : memoryProperties.memoryProperties.memoryHeaps)
+				if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) return heap.size;
+			return static_cast<VkDeviceSize>(0);
+		}
+		
 		VkResult QueryPhysicalDevices(VkInstance instance, std::vector<VkPhysicalDevice>& devices) {
 			uint32_t deviceCount;
 			VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, VK_NULL_HANDLE);
@@ -129,6 +147,23 @@
 				return VK_SUCCESS;
 			}
 			return VK_ERROR_DEVICE_LOST;
+		}
+
+		TinyQueueFamily QueryPhysicalDeviceQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR presentSurface) {
+			TinyQueueFamily indices = {};
+			if (device != VK_NULL_HANDLE) {
+				std::vector<VkQueueFamilyProperties> queueFamilies;
+				QueryQueueFamilyProperties(device, queueFamilies);
+				for (int i = 0; i < queueFamilies.size(); i++) {
+					VkBool32 presentSupport = false;
+					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, presentSurface, &presentSupport);
+					if (!indices.hasGraphicsFamily && !indices.hasPresentFamily && presentSupport && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits) {
+						indices.SetGraphicsFamily(i);
+						indices.SetPresentFamily(i);
+					}
+				}
+			}
+			return indices;
 		}
 
 		#pragma endregion

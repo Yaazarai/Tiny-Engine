@@ -108,19 +108,18 @@
         #include "./Utilities/TinyDisposable.hpp"
         #include "./Utilities/TinyUtilities.hpp"
     #pragma endregion
-    #pragma region ENGINE_SYSTEMS
+    #pragma region ENGINE_INITIALIZATION
         #include "./TinyWindow.hpp"
         #include "./TinyVulkanDevice.hpp"
         #include "./TinyCommandPool.hpp"
         #include "./TinyPipeline.hpp"
     #pragma endregion
-    #pragma region ENGINE_RESOURCES
+    #pragma region ENGINE_RENDERING
         #include "./TinyBuffer.hpp"
         #include "./TinyImage.hpp"
         #include "./TinySwapchain.hpp"
-        #include "./TinyRenderCmd.hpp"
     #pragma endregion
-    #pragma region ENGINE_RENDERING
+    #pragma region ENGINE_RENDERGRAPH
         #include "./TinyMath.hpp"
         #include "./TinyRenderGraph.hpp"
     #pragma endregion

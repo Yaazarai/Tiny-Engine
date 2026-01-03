@@ -36,7 +36,7 @@
 
 			/// @brief Creates the underlying command pool with: VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT enabled.
 			VkResult CreateCommandPool() {
-				TinyQueueFamily queueFamily = vkdevice.QueryPhysicalDeviceQueueFamilies();
+				TinyQueueFamily queueFamily = QueryPhysicalDeviceQueueFamilies(vkdevice.physicalDevice, vkdevice.presentSurface);
 				VkCommandPoolCreateInfo poolInfo { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, .queueFamilyIndex = queueFamily.graphicsFamily };
                 return vkCreateCommandPool(vkdevice.logicalDevice, &poolInfo, VK_NULL_HANDLE, &commandPool);
 			}
@@ -73,9 +73,8 @@
 			VkResult ReturnBuffer(std::pair<VkCommandBuffer, int32_t> bufferIndexPair) {
 				if (bufferIndexPair.second < 0 || bufferIndexPair .second >= commandBuffers.size())
 					return VK_ERROR_NOT_PERMITTED_KHR;
-
 				commandBuffers[bufferIndexPair.second].second = false;
-                return VK_SUCCESS;
+				return VK_SUCCESS;
 			}
 
 			/// @brief Sets all of the command buffers to available--optionally resets their recorded commands.

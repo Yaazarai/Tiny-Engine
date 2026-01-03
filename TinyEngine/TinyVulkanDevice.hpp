@@ -5,16 +5,6 @@
 	#include "./TinyEngine.hpp"
 	
 	namespace TINY_ENGINE_NAMESPACE {
-		/// @brief Vulkan Queue Family flags.
-		struct TinyQueueFamily {
-			uint32_t graphicsFamily, presentFamily;
-			bool hasGraphicsFamily, hasPresentFamily;
-
-			TinyQueueFamily() : graphicsFamily(0), presentFamily(0), hasGraphicsFamily(false), hasPresentFamily(false) {}
-			void SetGraphicsFamily(uint32_t queueFamily) { graphicsFamily = queueFamily; hasGraphicsFamily = true; }
-			void SetPresentFamily(uint32_t queueFamily) { presentFamily = queueFamily; hasPresentFamily = true; }
-		};
-
 		/// @brief Vulkan Instance & Render(Physical/Logical) Device & VMAllocator Loader.
 		class TinyVkDevice : public TinyDisposable {
 		public:
@@ -53,39 +43,11 @@
 				if (instance != VK_NULL_HANDLE) vkDestroyInstance(instance, VK_NULL_HANDLE);
 			}
 
-			/// @brief Create managed VkDevice via Vulkan API. Initializes Vulkan: Must call Initialize() manually.
+			/// @brief Create managed VkDevice via Vulkan API. Automatically calls Initialize().
 			TinyVkDevice(TinyWindow* window = VK_NULL_HANDLE, VkPhysicalDeviceFeatures deviceFeatures = { .multiDrawIndirect = VK_TRUE })
 			: window(window), deviceFeatures(deviceFeatures) {
 				onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
-			}
-
-			/// @brief Returns info about the VkPhysicalDevice graphics/present queue families. If no surface provided, auto checks for Win32 surface support.
-			TinyQueueFamily QueryPhysicalDeviceQueueFamilies(VkPhysicalDevice device = VK_NULL_HANDLE) {
-				device = (device == VK_NULL_HANDLE)? physicalDevice : device;
-				if (device == VK_NULL_HANDLE) return {};
-
-				std::vector<VkQueueFamilyProperties> queueFamilies;
-				QueryQueueFamilyProperties(physicalDevice, queueFamilies);
-				TinyQueueFamily indices = {};
-				for (int i = 0; i < queueFamilies.size(); i++) {
-					VkBool32 presentSupport = false;
-					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, presentSurface, &presentSupport);
-					if (!indices.hasGraphicsFamily && !indices.hasPresentFamily && presentSupport && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits) {
-						indices.SetGraphicsFamily(i);
-						indices.SetPresentFamily(i);
-					}
-				}
-				return indices;
-			}
-
-			/// @brief Returns an VkDeviceSize ranking of VK_PHYSICAL_DEVICE_TYPE for a VkPhysicalDevice ranked by memory heap size.
-			VkDeviceSize QueryPhysicalDeviceRankByHeapSize(VkPhysicalDevice device) {
-				VkPhysicalDeviceMemoryProperties2 memoryProperties { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
-				vkGetPhysicalDeviceMemoryProperties2(device, &memoryProperties);
-				for(VkMemoryHeap heap : memoryProperties.memoryProperties.memoryHeaps)
-					if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) return heap.size;
-				return static_cast<VkDeviceSize>(0);
 			}
 
 			/// @brief Creates the underlying Vulkan Instance w/ Required Extensions.
@@ -126,7 +88,7 @@
 				if (physicalDevice == VK_NULL_HANDLE) return VK_ERROR_DEVICE_LOST;
 
 				std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-				queueFamilyIndices = QueryPhysicalDeviceQueueFamilies(physicalDevice);
+				queueFamilyIndices = QueryPhysicalDeviceQueueFamilies(physicalDevice, presentSurface);
 				std::set<uint32_t> uniqueQueueFamilies = { queueFamilyIndices.graphicsFamily, queueFamilyIndices.presentFamily };
                 if (!queueFamilyIndices.hasGraphicsFamily || !queueFamilyIndices.hasPresentFamily) return VK_ERROR_INITIALIZATION_FAILED;
 
@@ -141,9 +103,11 @@
 					.pEnabledFeatures = &deviceFeatures, .pNext = &defaultDynamicRenderingCreateInfo
 				};
 
-				VkResult result = vkCreateDevice(physicalDevice, &createInfo, VK_NULL_HANDLE, &logicalDevice);
-				if (result != VK_SUCCESS) return result;
+				return vkCreateDevice(physicalDevice, &createInfo, VK_NULL_HANDLE, &logicalDevice);
+			}
 
+			/// @brief Creates the VMA memory allocator for handling GPU allocated memory.
+			VkResult CreateMemoryAllocator() {
 				VmaAllocatorCreateInfo allocatorCreateInfo { .vulkanApiVersion = TINY_ENGINE_VERSION, .physicalDevice = physicalDevice, .device = logicalDevice, .instance = instance };
 				return vmaCreateAllocator(&allocatorCreateInfo, &memoryAllocator);
 			}
@@ -154,7 +118,8 @@
 				if ((result = CreateVkInstance()) != VK_SUCCESS) return result;
 				if ((result = vkCmdRenderingGetCallbacks(instance)) != VK_SUCCESS) return result;
 				if ((result = CreatePhysicalDevice()) != VK_SUCCESS) return result;
-				result = CreateLogicalDevice();
+				if ((result = CreateLogicalDevice()) != VK_SUCCESS) return result;
+				result = CreateMemoryAllocator();
 
 				#if TINY_ENGINE_VALIDATION
 					VkPhysicalDevicePushDescriptorPropertiesKHR pushDescriptorProperties = defaultPushDescriptorProperties;
