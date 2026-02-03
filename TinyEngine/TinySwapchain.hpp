@@ -19,7 +19,6 @@
 
 				vkGetPhysicalDeviceSurfaceFormatsKHR(device, presentSurface, &formatCount, (formatCount > 0)? details.formats.data() : VK_NULL_HANDLE);
 				vkGetPhysicalDeviceSurfacePresentModesKHR(device, presentSurface, &presentModeCount, (presentModeCount > 0)? details.presentModes.data() : VK_NULL_HANDLE);
-
 				return details;
 			}
 
@@ -36,7 +35,6 @@
 				for (const auto& availablePresentMode : availablePresentModes)
 					if (availablePresentMode == presentDetails.idealPresentMode)
 						return availablePresentMode;
-
 				return VK_PRESENT_MODE_FIFO_KHR;
 			}
 
@@ -49,10 +47,7 @@
 					std::min(std::max((uint32_t)width, capabilities.minImageExtent.width), capabilities.maxImageExtent.width),
 					std::min(std::max((uint32_t)height, capabilities.minImageExtent.height), capabilities.maxImageExtent.height)
 				};
-
-				extent.width = std::max(1u, extent.width);
-				extent.height = std::max(1u, extent.height);
-				return extent;
+				return { std::max(1u, extent.width), std::max(1u, extent.height) };
 			}
 
 			/// @brief Acquires the next image from the swap chain and returns out that image index.
@@ -80,14 +75,13 @@
 				createInfo.imageExtent = extent;
 				createInfo.imageArrayLayers = 1; // Change when developing VR or other 3D stereoscopic applications
 				createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-
-				TinyQueueFamily indices = vkdevice.QueryPhysicalDeviceQueueFamilies();
-				if (!indices.hasGraphicsFamily || !indices.hasPresentFamily)
+				
+				if (!vkdevice.queueFamilyIndices.hasGraphicsFamily || !vkdevice.queueFamilyIndices.hasPresentFamily)
 					return VK_ERROR_INITIALIZATION_FAILED;
+				
+				uint32_t queueFamilyIndices[] = { vkdevice.queueFamilyIndices.graphicsFamily, vkdevice.queueFamilyIndices.presentFamily };
 
-				uint32_t queueFamilyIndices[] = { indices.graphicsFamily, indices.presentFamily };
-
-				if (indices.graphicsFamily != indices.presentFamily) {
+				if (vkdevice.queueFamilyIndices.graphicsFamily != vkdevice.queueFamilyIndices.presentFamily) {
 					createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 					createInfo.queueFamilyIndexCount = 2;
 					createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -126,22 +120,12 @@
 				VkSurfaceFormatKHR surfaceFormat = QuerySwapSurfaceFormat(presentDetails, swapChainSupport.formats);
 				
 				for (size_t i = 0; i < swapChainImages.size(); i++) {
-					VkImageViewCreateInfo createInfo {};
-					createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-					createInfo.image = swapChainImages[i]->image;
-					createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-					createInfo.format = surfaceFormat.format;
-
-					createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-					createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-					createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-					createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-					createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-					createInfo.subresourceRange.baseMipLevel = 0;
-					createInfo.subresourceRange.levelCount = 1;
-					createInfo.subresourceRange.baseArrayLayer = 0;
-					createInfo.subresourceRange.layerCount = 1;
+					VkImageViewCreateInfo createInfo {
+						.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+						.image = swapChainImages[i]->image, .viewType = VK_IMAGE_VIEW_TYPE_2D, .format = surfaceFormat.format,
+						.components.r = VK_COMPONENT_SWIZZLE_IDENTITY, .components.g = VK_COMPONENT_SWIZZLE_IDENTITY, .components.b = VK_COMPONENT_SWIZZLE_IDENTITY, .components.a = VK_COMPONENT_SWIZZLE_IDENTITY,
+						.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .subresourceRange.baseMipLevel = 0, .subresourceRange.levelCount = 1, .subresourceRange.baseArrayLayer = 0, .subresourceRange.layerCount = 1,
+					};
 					vkCreateImageView(vkdevice.logicalDevice, &createInfo, VK_NULL_HANDLE, &swapChainImages[i]->imageView);
 				}
 			}
@@ -156,9 +140,8 @@
 			static VkResult QueuePresent(VkQueue presentQueue, VkSwapchainKHR swapchain, VkSemaphore imageFinished, uint32_t swapImageIndex) {
 				VkPresentInfoKHR presentInfo {
 					.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-					.waitSemaphoreCount = 1, .pWaitSemaphores = &imageFinished,
-					.swapchainCount = 1, .pSwapchains = &swapchain,
-					.pImageIndices = &swapImageIndex
+					.waitSemaphoreCount = 1, .pImageIndices = &swapImageIndex, .pWaitSemaphores = &imageFinished,
+					.swapchainCount = 1, .pSwapchains = &swapchain
 				};
 				return vkQueuePresentKHR(presentQueue, &presentInfo);
 			}

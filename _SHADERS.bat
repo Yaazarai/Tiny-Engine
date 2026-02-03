@@ -14,7 +14,6 @@ if %1 == _DEBUG (
 	for %%f in (%CD%\Shaders\*.frag %CD%\Shaders\*.vert %CD%\Shaders\*.comp) do (
 		if %%~xf == .frag (echo 	Vertex Stage:		%%~nf.spv)
 		if %%~xf == .vert (echo 	Fragment Stage:		%%~nf.spv)
-		if %%~xf == .comp (echo 	Compute Stage:		%%~nf.spv)
 		"%VULKAN%\Bin\glslc.exe" %%f -o "%CD%\x64\DEBUG\Shaders\%%~nf.spv"
 	)
 )
@@ -29,7 +28,6 @@ if %1 == _RELEASE (
 	for %%f in (%CD%\Shaders\*.frag %CD%\Shaders\*.vert %CD%\Shaders\*.comp) do (
 		if %%~xf == .frag (echo 	Vertex Stage:		%%~nf.spv)
 		if %%~xf == .vert (echo 	Fragment Stage:		%%~nf.spv)
-		if %%~xf == .comp (echo 	Compute Stage:		%%~nf.spv)
 		"%VULKAN%\Bin\glslc.exe" %%f -o "%CD%\x64\RELEASE\Shaders\%%~nf.spv"
 	)
 )

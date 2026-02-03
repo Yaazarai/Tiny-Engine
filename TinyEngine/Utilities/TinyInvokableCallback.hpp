@@ -8,7 +8,6 @@
     #include <vector>
     #include <mutex>
     #include <utility>
-    #include <type_traits>
 
     namespace TINY_ENGINE_NAMESPACE {
         /// @brief Function callback-type for event execution.

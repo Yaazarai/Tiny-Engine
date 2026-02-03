@@ -7,23 +7,32 @@
 		#pragma region VULKAN_DEBUG_UTILITIES
 
 		VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+			#if TINY_ENGINE_VALIDATION
 			auto create = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 			if (create != VK_NULL_HANDLE)
 				return create(instance, pCreateInfo, pAllocator, pDebugMessenger);
 			return VK_ERROR_INITIALIZATION_FAILED;
+			#endif
+			return VK_SUCCESS;
 		}
 
 		VkResult DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
+			#if TINY_ENGINE_VALIDATION
 			auto destroy = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 			destroy(instance, debugMessenger, pAllocator);
 			if (destroy != VK_NULL_HANDLE)
 				return VK_SUCCESS;
 			return VK_ERROR_INITIALIZATION_FAILED;
+			#endif
+			return VK_SUCCESS;
 		}
 
 		VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
+			#if TINY_ENGINE_VALIDATION
 			std::cout << "TinyEngine: Validation Layer: " << pCallbackData->pMessage << std::endl;
 			return (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)? VK_TRUE : VK_FALSE;
+			#endif
+			return VK_FALSE;
 		}
 
 		#pragma endregion
@@ -83,6 +92,16 @@
 		#pragma endregion
         #pragma region VULKAN_INTERFACE SUPPORT
 
+		/// @brief Vulkan Queue Family flags.
+		struct TinyQueueFamily {
+			uint32_t graphicsFamily, presentFamily;
+			bool hasGraphicsFamily, hasPresentFamily;
+
+			TinyQueueFamily() : graphicsFamily(0), presentFamily(0), hasGraphicsFamily(false), hasPresentFamily(false) {}
+			void SetGraphicsFamily(uint32_t queueFamily) { graphicsFamily = queueFamily; hasGraphicsFamily = true; }
+			void SetPresentFamily(uint32_t queueFamily) { presentFamily = queueFamily; hasPresentFamily = true; }
+		};
+
 		/// @brief Description of the SwapChain Rendering format.
 		struct TinySwapChainSupporter {
 		public:
@@ -101,7 +120,15 @@
 
         #pragma endregion
 		#pragma region VULKAN_ENUMERATE_HELPER_FUNCTIONS
-
+		
+		VkDeviceSize QueryPhysicalDeviceRankByHeapSize(VkPhysicalDevice device) {
+			VkPhysicalDeviceMemoryProperties2 memoryProperties { .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2 };
+			vkGetPhysicalDeviceMemoryProperties2(device, &memoryProperties);
+			for(VkMemoryHeap heap : memoryProperties.memoryProperties.memoryHeaps)
+				if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) return heap.size;
+			return static_cast<VkDeviceSize>(0);
+		}
+		
 		VkResult QueryPhysicalDevices(VkInstance instance, std::vector<VkPhysicalDevice>& devices) {
 			uint32_t deviceCount;
 			VkResult result = vkEnumeratePhysicalDevices(instance, &deviceCount, VK_NULL_HANDLE);
@@ -122,13 +149,30 @@
 			return VK_ERROR_DEVICE_LOST;
 		}
 
+		TinyQueueFamily QueryPhysicalDeviceQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR presentSurface) {
+			TinyQueueFamily indices = {};
+			if (device != VK_NULL_HANDLE) {
+				std::vector<VkQueueFamilyProperties> queueFamilies;
+				QueryQueueFamilyProperties(device, queueFamilies);
+				for (int i = 0; i < queueFamilies.size(); i++) {
+					VkBool32 presentSupport = false;
+					vkGetPhysicalDeviceSurfaceSupportKHR(device, i, presentSurface, &presentSupport);
+					if (!indices.hasGraphicsFamily && !indices.hasPresentFamily && presentSupport && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT && queueFamilies[i].timestampValidBits) {
+						indices.SetGraphicsFamily(i);
+						indices.SetPresentFamily(i);
+					}
+				}
+			}
+			return indices;
+		}
+
 		#pragma endregion
 		#pragma region VULKAN_DEFAULT_PIPELINE_STATES
 		
 		const VkDebugUtilsMessengerCreateInfoEXT defaultDebugCreateInfo {
 			.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-			.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.messageType = /*VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |*/ VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 			.pfnUserCallback = DebugCallback,
 			.pUserData = VK_NULL_HANDLE
 		};
@@ -154,6 +198,7 @@
 		const VkPhysicalDeviceDynamicRenderingFeatures defaultDynamicRenderingCreateInfo {
 			.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
 			.dynamicRendering = VK_TRUE,
+			.pNext = const_cast<VkPhysicalDeviceTimelineSemaphoreFeatures*>(&defaultTimelineSemaphoreFeatures)
 		};
 
 		const VkPipelineVertexInputStateCreateInfo defaultVertexInputInfo {

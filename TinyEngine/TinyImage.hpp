@@ -26,6 +26,7 @@
 			~TinyImage() { this->Dispose(); }
 
 			void Disposable(bool waitIdle) {
+				if (waitIdle) vkDeviceWaitIdle(vkdevice.logicalDevice);
 				if (imageType != TinyImageType::TYPE_SWAPCHAIN) {
 					if (imageSampler != VK_NULL_HANDLE) vkDestroySampler(vkdevice.logicalDevice, imageSampler, VK_NULL_HANDLE);
 					if (imageView != VK_NULL_HANDLE) vkDestroyImageView(vkdevice.logicalDevice, imageView, VK_NULL_HANDLE);
@@ -40,8 +41,7 @@
             }
 
             VkResult CreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false) {
-				if (type == TinyImageType::TYPE_SWAPCHAIN)
-					return VK_ERROR_INITIALIZATION_FAILED;
+				if (type == TinyImageType::TYPE_SWAPCHAIN) return VK_ERROR_INITIALIZATION_FAILED;
 
 				VkImageCreateInfo imgCreateInfo = {
 					.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -49,7 +49,7 @@
 					.extent.depth = 1, .mipLevels = 1, .arrayLayers = 1,
 					.format = format, .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, .imageType = VK_IMAGE_TYPE_2D,
 					.tiling = VK_IMAGE_TILING_OPTIMAL, .samples = VK_SAMPLE_COUNT_1_BIT,
-					.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+					.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 				};
 
 				this->width = width;
@@ -58,11 +58,6 @@
 
 				TinyImageLayout newLayout;
 				switch(imageType) {
-					case TinyImageType::TYPE_STORAGE:
-						newLayout = TinyImageLayout::LAYOUT_STORAGE;
-						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
-						aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-					break;
 					case TinyImageType::TYPE_COLORATTACHMENT:
 						newLayout = TinyImageLayout::LAYOUT_COLOR_ATTACHMENT;
 						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -153,12 +148,6 @@
 							srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 							dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 						break;
-						case TinyImageLayout::LAYOUT_STORAGE:
-							srcStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-							dstStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-							srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-							dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-						break;
 						case TinyImageLayout::LAYOUT_UNDEFINED:
 						default:
 							srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -200,12 +189,6 @@
 							dstAccessMask = VK_ACCESS_NONE;
 						break;
 						case TinyImageLayout::LAYOUT_GENERAL:
-							srcStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-							dstStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-							srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-							dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
-						break;
-						case TinyImageLayout::LAYOUT_STORAGE:
 							srcStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 							dstStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 							srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;

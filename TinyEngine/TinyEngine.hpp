@@ -90,7 +90,6 @@
     ///
     /// General include libraries (data-structs, for-each search, etc.).
     ///
-    #include <memory>
     #include <mutex>
     #include <fstream>
     #include <iostream>
@@ -101,35 +100,28 @@
     #include <algorithm>
     #include <functional>
     #include <utility>
-    #include <type_traits>
 
-    /// 
-    /// Image Encoding / Decoding (using QOI: Quite Okay Image "Format").
-    /// 
-    #include "./Libraries/QuiteOkayImageFormat.h"
-
-    #pragma region BACKEND_SYSTEMS
+    #pragma region ENGINE_UTILITIES
         #include "./Utilities/TinyEnums.hpp"
         #include "./Utilities/TinyTimedGuard.hpp"
         #include "./Utilities/TinyInvokableCallback.hpp"
         #include "./Utilities/TinyDisposable.hpp"
         #include "./Utilities/TinyUtilities.hpp"
     #pragma endregion
-    #pragma region WINDOW_INPUT_HANDLING
+    #pragma region ENGINE_INITIALIZATION
         #include "./TinyWindow.hpp"
-    #pragma endregion
-    #pragma region VULKAN_INITIALIZATION
         #include "./TinyVulkanDevice.hpp"
         #include "./TinyCommandPool.hpp"
         #include "./TinyPipeline.hpp"
     #pragma endregion
-    #pragma region TINY_RENDERING
+    #pragma region ENGINE_RENDERING
         #include "./TinyBuffer.hpp"
         #include "./TinyImage.hpp"
         #include "./TinySwapchain.hpp"
-        #include "./TinyRenderCmd.hpp"
-        #include "./TinyRenderGraph.hpp"
+    #pragma endregion
+    #pragma region ENGINE_RENDERGRAPH
         #include "./TinyMath.hpp"
+        #include "./TinyRenderGraph.hpp"
     #pragma endregion
 #endif
 

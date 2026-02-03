@@ -83,8 +83,11 @@
                 return {
                     TinyVertex({uv1.x, uv1.y}, {xy1.x, xy1.y, depth}, vcolors[0]),
                     TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vcolors[1]),
-                    TinyVertex({uv2.x, uv2.y}, {xy2.x, xy2.y, depth}, vcolors[2]),
-                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[3])
+                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[2]),
+
+                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vcolors[0]),
+                    TinyVertex({uv2.x, uv2.y}, {xy2.x, xy2.y, depth}, vcolors[1]),
+                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[2]),
                 };
             }
 
@@ -92,17 +95,13 @@
                 return CreateFromAtlas(xywh, depth, glm::vec4(0.0, 0.0, 1.0, 1.0), glm::vec2(1.0, 1.0), vcolors);
             }
             
-            static std::vector<glm::vec4> CreateVertexColors(glm::vec4 TL, glm::vec4 TR, glm::vec4 BL, glm::vec4 BR) {
-                return {TL, TR, BR, BL};
-            }
-            
             static glm::vec2 GetQuadAtlasXYWH(std::vector<TinyVertex>& quad) {
-                glm::vec2 wh = quad[2].texcoord - quad[0].texcoord;
+                glm::vec2 wh = quad[4].texcoord - quad[0].texcoord;
                 return glm::vec4(quad[0].texcoord.x, quad[0].texcoord.y, wh.x, wh.y);
             }
 
             static glm::vec4 GetQuadXYWH(std::vector<TinyVertex>& quad) {
-                glm::vec2 wh = quad[2].position - quad[0].position;
+                glm::vec2 wh = quad[4].position - quad[0].position;
                 return glm::vec4(quad[0].position.x, quad[0].position.y, wh.x, wh.y);
             }
             
@@ -123,22 +122,25 @@
             }
 
             static void Reposition(std::vector<TinyVertex>& quad, glm::vec2 xy, bool relative) {
-                if (relative) {
-                    quad[0].position += glm::vec3(xy,0.0f);
-                    quad[1].position += glm::vec3(xy,0.0f);
-                    quad[2].position += glm::vec3(xy,0.0f);
-                    quad[3].position += glm::vec3(xy,0.0f);
-                } else {
-                    glm::vec2 wh = glm::vec2(quad[1].position.x - quad[0].position.x, quad[2].position.y - quad[3].position.y);
-                    quad[0].position = glm::vec3(xy, quad[0].position.z);
-                    quad[1].position = glm::vec3(xy.x + wh.x, xy.y, quad[1].position.z);
-                    quad[2].position = glm::vec3(xy.x + wh.x, xy.y + wh.y, quad[2].position.z);
-                    quad[3].position = glm::vec3(xy.x, xy.y + wh.y, quad[3].position.z);
+                if (!relative) {
+                    quad[0].position -= quad[0].position;
+                    quad[1].position -= quad[0].position;
+                    quad[2].position -= quad[0].position;
+                    quad[3].position -= quad[0].position;
+                    quad[4].position -= quad[0].position;
+                    quad[5].position -= quad[0].position;
                 }
+
+                quad[0].position += glm::vec3(xy,0.0f);
+                quad[1].position += glm::vec3(xy,0.0f);
+                quad[2].position += glm::vec3(xy,0.0f);
+                quad[3].position += glm::vec3(xy,0.0f);
+                quad[4].position += glm::vec3(xy,0.0f);
+                quad[5].position += glm::vec3(xy,0.0f);
             }
         };
 
         /// @brief Default (white) color layout for generating quads.
-        const std::vector<glm::vec4> TinyQuad::defvcolors = { {1.0,1.0,1.0,1.0},{1.0,1.0,1.0,1.0},{1.0,1.0,1.0,1.0},{1.0,1.0,1.0,1.0} };
+        const std::vector<glm::vec4> TinyQuad::defvcolors = { {1.0,1.0,1.0,1.0}, {1.0,1.0,1.0,1.0}, {1.0,1.0,1.0,1.0} };
     }
 #endif
