@@ -304,10 +304,18 @@
 					resizableImages.push_back(resizableImage);
 			}
 
-			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, VkExtent2D extent, VkDeviceSize subpassCount = 1, uint32_t maxTimestamps = 16U) {
+			std::vector<TinyRenderPass*> CreateRenderPass(TinyCommandPool& cmdPool, TinyPipeline& pipeline, std::string title, std::vector<VkExtent2D> extents, VkDeviceSize subpassCount = 1, uint32_t maxTimestamps = 16U) {
 				std::vector<TinyRenderPass*> subpasses;
+				if (extents.size() == 0) {
+					#if TINY_ENGINE_VALIDATION
+						std::cout << "Tried to create [" << subpassCount << "] subpasses with zero provided image extents." << std::endl;
+					#endif
+					return subpasses;
+				}
+
 				for(int32_t i = 0; i < std::max(1, static_cast<int32_t>(subpassCount)); i++) {
-					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extent, maxTimestamps);
+					size_t index = (extents.size() == subpassCount? static_cast<size_t>(i) : extents[0];
+					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extents[index], maxTimestamps);
 					renderPasses.push_back(renderpass);
 					subpasses.push_back(renderpass);
                     
