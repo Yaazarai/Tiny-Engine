@@ -21,8 +21,8 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
     TinyRenderGraph graph(vkdevice, &window);
     
-    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool1, pipeline1, "Staging Data Pass", {{ 1920, 1080 }}, 1);
-    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool2, pipeline2, "Texture Input Pass", {{ 1920, 1080 }}, 1);
+    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool1, pipeline1, "Staging Data Pass", {VkExtent2D(1920, 1080)}, 1);
+    std::vector<TinyRenderPass*> renderpass2 = graph.CreateRenderPass(cmdpool2, pipeline2, "Texture Input Pass", {VkExtent2D(1920, 1080)}, 1);
     graph.ResizeImageWithSwapchain(renderpass2[0]->targetImage);
     std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool3, pipeline3, "Copy Pass", {{ 1920, 1080 }}, 1);
     renderpass2[0]->AddDependency(*renderpass1[0]);

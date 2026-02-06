@@ -314,7 +314,7 @@
 				}
 
 				for(int32_t i = 0; i < std::max(1, static_cast<int32_t>(subpassCount)); i++) {
-					size_t index = (extents.size() == subpassCount? static_cast<size_t>(i) : extents[0];
+					size_t index = (extents.size() == static_cast<size_t>(subpassCount))? static_cast<size_t>(i) : 0ULL;
 					TinyRenderPass* renderpass = new TinyRenderPass(vkdevice, cmdPool, pipeline, title, renderPassCounter ++, extents[index], maxTimestamps);
 					renderPasses.push_back(renderpass);
 					subpasses.push_back(renderpass);
