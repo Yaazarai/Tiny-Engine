@@ -51,31 +51,17 @@
 					.tiling = VK_IMAGE_TILING_OPTIMAL, .samples = VK_SAMPLE_COUNT_1_BIT,
 					.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 				};
-
+				
 				this->width = width;
 				this->height = height;
-				imageLayout = TinyImageLayout::LAYOUT_UNDEFINED;
-
-				TinyImageLayout newLayout;
-				switch(imageType) {
-					case TinyImageType::TYPE_COLORATTACHMENT:
-						newLayout = TinyImageLayout::LAYOUT_COLOR_ATTACHMENT;
-						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-						aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-					break;
-					case TinyImageType::TYPE_SHADER_READONLY:
-						newLayout = TinyImageLayout::LAYOUT_SHADER_READONLY;
-						imgCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-						aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-					break;
-				}
+				this->imageLayout = TinyImageLayout::LAYOUT_UNDEFINED;
+				this->aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+				this->interpolation = interpolation;
 
 				VmaAllocationCreateInfo allocCreateInfo {};
 				allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 				allocCreateInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 				allocCreateInfo.priority = 1.0f;
-
-				this->interpolation = interpolation;
 				
 				VkResult result = vmaCreateImage(vkdevice.memoryAllocator, &imgCreateInfo, &allocCreateInfo, &image, &memory, VK_NULL_HANDLE);
 				if (result != VK_SUCCESS) return result;

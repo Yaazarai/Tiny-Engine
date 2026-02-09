@@ -4,7 +4,7 @@
 
 	namespace TINY_ENGINE_NAMESPACE {
 		enum class TinyRenderType {
-			STAGING_COMMAND, PUSH_CONSTANT, PUSH_DESCRIPTOR, VERTEX_BUFFER, DRAW_COMMAND, RENDER_AREA, CLEAR_COLOR
+			STAGING_BUFFER, STAGING_IMAGE, PUSH_CONSTANT, PUSH_DESCRIPTOR, VERTEX_BUFFER, DRAW_COMMAND, RENDER_AREA, CLEAR_COLOR
 		};
 
 		struct TinyRenderCmd {
@@ -23,16 +23,18 @@
 			std::vector<TinyRenderCmd> commands;
 
 			void StageBuffer(TinyBuffer& stageBuffer, TinyBuffer& destBuffer, void* pdata, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
-				TinyRenderCmd cmd = { .type = TinyRenderType::STAGING_COMMAND, .srcBuffer = &stageBuffer, .dstBuffer = &destBuffer, .values[0] = byteSize, .values[1] = destOffset, .pdata = pdata };
+				TinyRenderCmd cmd = { .type = TinyRenderType::STAGING_BUFFER, .srcBuffer = &stageBuffer, .dstBuffer = &destBuffer, .values[0] = byteSize, .values[1] = destOffset, .pdata = pdata };
 				destOffset += byteSize;
 				commands.push_back(cmd);
 			}
 
-			void StageImage(TinyBuffer& stageBuffer, TinyImage& destImage, void* pdata, VkRect2D rect, VkDeviceSize byteSize) {
-				TinyRenderCmd cmd = { .type = TinyRenderType::STAGING_COMMAND, .srcBuffer = &stageBuffer, .dstImage = &destImage, .pdata = pdata,
+			void StageImage(TinyBuffer& stageBuffer, TinyImage& destImage, void* pdata, VkRect2D rect, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
+				TinyRenderCmd cmd = { .type = TinyRenderType::STAGING_IMAGE, .srcBuffer = &stageBuffer, .dstImage = &destImage, .pdata = pdata,
 					.values[0] = static_cast<VkDeviceSize>(rect.extent.width), .values[1] = static_cast<VkDeviceSize>(rect.extent.height),
 					.values[2] = static_cast<VkDeviceSize>(rect.offset.x), .values[3] = static_cast<VkDeviceSize>(rect.offset.y),
-					.values[4] = byteSize };
+					.values[4] = byteSize,
+					.values[5] = destOffset };
+				destOffset += byteSize;
 				commands.push_back(cmd);
 			}
 
@@ -413,7 +415,7 @@
 					
 					for(TinyRenderCmd rendercmd : renderPasses[i]->renderObject.commands) {
 						switch(rendercmd.type) {
-							case TinyRenderType::STAGING_COMMAND:
+							case TinyRenderType::STAGING_BUFFER:
 								{
 									TinyBuffer& stagedBuffer = *rendercmd.srcBuffer;
 									TinyBuffer& destBuffer = *rendercmd.dstBuffer;
@@ -425,6 +427,34 @@
 									memcpy(stagedOffset, sourceData, (size_t)sourceSize);
 									VkBufferCopy copyRegion { .srcOffset = destOffset, .dstOffset = 0, .size = sourceSize };
 									vkCmdCopyBuffer(cmdbufferPair.first, stagedBuffer.buffer, destBuffer.buffer, 1, &copyRegion);
+								}
+							break;
+							case TinyRenderType::STAGING_IMAGE:
+								{
+									TinyBuffer& stagedBuffer = *rendercmd.srcBuffer;
+									TinyImage& destImage = *rendercmd.dstImage;
+									VkDeviceSize imageWidth = rendercmd.values[0];
+									VkDeviceSize imageHeight = rendercmd.values[1];
+									VkDeviceSize imageYoffset = rendercmd.values[2];
+									VkDeviceSize imageXoffset = rendercmd.values[3];
+									VkDeviceSize sourceSize = rendercmd.values[4];
+									VkDeviceSize destOffset = rendercmd.values[5];
+									void* sourceData = rendercmd.pdata;
+
+									void* stagedOffset = static_cast<int8_t*>(stagedBuffer.description.pMappedData) + destOffset;
+									memcpy(stagedOffset, sourceData, (size_t)sourceSize);
+									
+									destImage.TransitionLayoutBarrier(cmdbufferPair.first, TinyCmdBufferSubmitStage::STAGE_BEGIN, TinyImageLayout::LAYOUT_TRANSFER_DST);
+									VkBufferImageCopy region = {
+										.imageSubresource.aspectMask = destImage.aspectFlags, .bufferOffset = 0, .bufferRowLength = 0, .bufferImageHeight = 0,
+										.imageSubresource.mipLevel = 0, .imageSubresource.baseArrayLayer = 0, .imageSubresource.layerCount = 1,
+										.imageExtent = { static_cast<uint32_t>((imageWidth == 0)?destImage.width:imageWidth), static_cast<uint32_t>((imageHeight == 0)?destImage.height:imageHeight), 1 },
+										.imageOffset = { static_cast<int32_t>(imageXoffset), static_cast<int32_t>(imageYoffset), 0 },
+										.bufferOffset = destOffset,
+									};
+
+									vkCmdCopyBufferToImage(cmdbufferPair.first, stagedBuffer.buffer, destImage.image, (VkImageLayout) destImage.imageLayout, 1, &region);
+									destImage.TransitionLayoutBarrier(cmdbufferPair.first, TinyCmdBufferSubmitStage::STAGE_END, TinyImageLayout::LAYOUT_SHADER_READONLY);
 								}
 							break;
 							case TinyRenderType::PUSH_CONSTANT:
