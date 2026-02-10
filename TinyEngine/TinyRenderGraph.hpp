@@ -186,7 +186,7 @@
 				vkCmdSetScissor(bufferIndexPair.first, 0, 1, &renderAreaKHR);
 
 				VkRenderingAttachmentInfoKHR colorAttachmentInfo { .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-					.clearValue = clearColor, .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+					.clearValue = clearColor, .loadOp = ((pipeline.createInfo.clearOnLoad)?VK_ATTACHMENT_LOAD_OP_CLEAR:VK_ATTACHMENT_LOAD_OP_DONT_CARE), .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 					.imageView = targetImage->imageView, .imageLayout = (VkImageLayout) targetImage->imageLayout
 				};
 				VkRenderingInfoKHR dynamicRenderInfo { .sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR, .colorAttachmentCount = 1, .pColorAttachments = &colorAttachmentInfo, .renderArea = renderAreaKHR, .layerCount = 1 };

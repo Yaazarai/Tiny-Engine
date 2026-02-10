@@ -18,12 +18,12 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyShader fragShader(TinyShaderStages::STAGE_FRAGMENT, SPRITE_FRAGMENT_SHADER, {}, {{TinyDescriptorType::TYPE_IMAGE_SAMPLER, TinyDescriptorBinding::BINDING_0}});
     
     TinyPipeline pipeline1(vkdevice, TinyPipelineCreateInfo::TransferInfo());
-    TinyPipeline pipeline2(vkdevice, TinyPipelineCreateInfo::GraphicsInfo(vertexShader, defaultFragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
-    TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, VK_FORMAT_B8G8R8A8_UNORM));
+    TinyPipeline pipeline2(vkdevice, TinyPipelineCreateInfo::GraphicsInfo(vertexShader, defaultFragShader, true, false, true, VK_FORMAT_B8G8R8A8_UNORM));
+    TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, true, VK_FORMAT_B8G8R8A8_UNORM));
     TinyRenderGraph graph(vkdevice, &window);
     
     std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, "Staging Data Pass", {VkExtent2D(1920, 1080)}, 1);
-    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", {{ 1920, 1080 }}, 1);
+    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", {VkExtent2D(1920, 1080)}, 1);
     renderpass3[0]->AddDependency(*renderpass1[0]);
 
     qoi_desc sourceImageDesc;
@@ -72,13 +72,13 @@ int TINY_ENGINE_WINDOWMAIN {
             #if TINY_ENGINE_VALIDATION
                 for(TinyRenderPass* pass : graph.renderPasses) {
                     std::vector<float> timestamps = pass->QueryTimeStamps();
-                    /*
+                    
                     for(float time : timestamps)
                         std::cout << " - [" << graph.frameCounter << "] " << pass->subpassIndex << " : " << pass->title << " - " << time << " ms" << std::endl;
                     
                     for(TinyRenderPass* dependency : pass->dependencies)
                         std::cout << "\t wait: " << dependency->title << " (" << dependency->subpassIndex << ")" << std::endl;
-                    */
+                
                 }
             #endif
         }

@@ -57,22 +57,23 @@
 			TinyPipelineType type;
 			bool blending;
 			bool interpolation;
+			bool clearOnLoad;
 			VkFormat imageFormat;
 			VkSamplerAddressMode addressMode;
 			VkPrimitiveTopology vertexTopology;
 			VkPolygonMode polygonTopology;
 			TinyVertexDescription vertexDescription;
 
-			static TinyPipelineCreateInfo GraphicsInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
-				return { {vertex, fragment}, TinyPipelineType::TYPE_GRAPHICS, blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
+			static TinyPipelineCreateInfo GraphicsInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, bool clearOnLoad = true, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
+				return { {vertex, fragment}, TinyPipelineType::TYPE_GRAPHICS, blending, interpolation, clearOnLoad, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
 			}
 
-			static TinyPipelineCreateInfo PresentInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
-				return { {vertex, fragment}, TinyPipelineType::TYPE_PRESENT, blending, interpolation, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
+			static TinyPipelineCreateInfo PresentInfo(TinyShader vertex, TinyShader fragment, bool blending = true, bool interpolation = false, bool clearOnLoad = true, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VkPrimitiveTopology vertexTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VkPolygonMode polygonTopology = VK_POLYGON_MODE_FILL, TinyVertexDescription vertexDescription = TinyVertex::GetVertexDescription()) {
+				return { {vertex, fragment}, TinyPipelineType::TYPE_PRESENT, blending, interpolation, clearOnLoad, imageFormat, addressMode, vertexTopology, polygonTopology, vertexDescription };
 			}
 
 			static TinyPipelineCreateInfo TransferInfo() {
-				return { {}, TinyPipelineType::TYPE_TRANSFER, true, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
+				return { {}, TinyPipelineType::TYPE_TRANSFER, true, false, false, VK_FORMAT_B8G8R8A8_UNORM, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL, TinyVertex::GetVertexDescription() };
 			}
 		};
 
