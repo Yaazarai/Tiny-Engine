@@ -121,6 +121,7 @@
     #pragma endregion
     #pragma region ENGINE_RENDERGRAPH
         #include "./TinyMath.hpp"
+        #include "./TinyRenderPass.hpp"
         #include "./TinyRenderGraph.hpp"
     #pragma endregion
 #endif

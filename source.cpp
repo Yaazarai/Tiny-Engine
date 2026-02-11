@@ -12,6 +12,7 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyWindow window("Tiny Engine", 1920, 1080, true, false, true, false, true, 640, 480);
     TinyVkDevice vkdevice(&window);
     TinyCommandPool cmdpool(vkdevice);
+    TinyRenderGraph graph(vkdevice, &window);
 
     TinyShader vertexShader(TinyShaderStages::STAGE_VERTEX, SPRITE_VERTEX_SHADER, { sizeof(glm::mat4) });
     TinyShader defaultFragShader(TinyShaderStages::STAGE_FRAGMENT, DEFAULT_FRAGMENT_SHADER);
@@ -20,10 +21,13 @@ int TINY_ENGINE_WINDOWMAIN {
     TinyPipeline pipeline1(vkdevice, TinyPipelineCreateInfo::TransferInfo());
     TinyPipeline pipeline2(vkdevice, TinyPipelineCreateInfo::GraphicsInfo(vertexShader, defaultFragShader, true, false, true, VK_FORMAT_B8G8R8A8_UNORM));
     TinyPipeline pipeline3(vkdevice, TinyPipelineCreateInfo::PresentInfo(vertexShader, fragShader, true, false, true, VK_FORMAT_B8G8R8A8_UNORM));
-    TinyRenderGraph graph(vkdevice, &window);
+
+    //TinyImage targetImage = new TinyImage(vkdevice, TinyImageType::TYPE_COLORATTACHMENT, subpassExtent.width, subpassExtent.height, pipeline.createInfo.imageFormat, pipeline.createInfo.addressMode, pipeline.createInfo.interpolation);
+    //targetImage->Initialize();
+    //graph.ResizeImageWithSwapchain(targetImage);
     
-    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, "Staging Data Pass", {VkExtent2D(1920, 1080)}, 1);
-    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, "Copy Pass", {VkExtent2D(1920, 1080)}, 1);
+    std::vector<TinyRenderPass*> renderpass1 = graph.CreateRenderPass(cmdpool, pipeline1, VK_NULL_HANDLE, "Staging Data Pass", 1);
+    std::vector<TinyRenderPass*> renderpass3 = graph.CreateRenderPass(cmdpool, pipeline3, VK_NULL_HANDLE, "Copy Pass", 1);
     renderpass3[0]->AddDependency(*renderpass1[0]);
 
     qoi_desc sourceImageDesc;
@@ -58,11 +62,9 @@ int TINY_ENGINE_WINDOWMAIN {
     renderpass3[0]->renderEvent.hook(TinyRenderEvent([&](TinyRenderPass& renderPass, TinyRenderObject& renderer, bool frameResized) {
         camera = TinyMath::Project2D(window.hwndWidth, window.hwndHeight, 0.0, 0.0, 1.0, 0.0);
         renderer.PushImage(sourceImage, 0);
-        renderer.PushConstant(TinyShaderStages::STAGE_VERTEX, &camera, sizeof(glm::mat4));
+        renderer.PushConstant(&camera, TinyShaderStages::STAGE_VERTEX, sizeof(glm::mat4));
         renderer.BindVertices(vertexBuffer, 0);
-        renderer.DrawInstances(6, 1, 6, 0);
-        renderer.SetClearColor(255, 0, 0, 255);
-        //renderer.SetRenderArea(0, 0, window.hwndWidth, window.hwndHeight);
+        renderer.DrawInstances(6, 1, 0, 0);
     }));
     
     std::thread mythread([&window, &graph, &vkdevice]() {
