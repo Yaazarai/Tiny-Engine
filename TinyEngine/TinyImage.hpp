@@ -34,13 +34,13 @@
 				}
 			}
 
-            TinyImage(TinyVkDevice& vkdevice, const TinyImageType imageType, VkDeviceSize width, VkDeviceSize height, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool interpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE)
+            TinyImage(TinyVkDevice& vkdevice, const TinyImageType imageType, VkDeviceSize width, VkDeviceSize height, VkFormat imageFormat = VK_FORMAT_B8G8R8A8_UNORM, VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, bool interpolation = false, VkImage imageSource = VK_NULL_HANDLE, VkImageView imageViewSource = VK_NULL_HANDLE, VkSampler imageSampler = VK_NULL_HANDLE)
             : vkdevice(vkdevice), imageType(imageType), width(width), height(height), imageFormat(imageFormat), addressMode(addressMode), interpolation(interpolation), image(imageSource), imageView(imageViewSource), imageSampler(imageSampler) {
                 onDispose.hook(TinyCallback<bool>([this](bool forceDispose) {this->Disposable(forceDispose); }));
 				initialized = Initialize();
             }
 
-            VkResult CreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, bool textureInterpolation = false) {
+            VkResult CreateImage(TinyImageType type, VkDeviceSize width, VkDeviceSize height, VkFormat format = VK_FORMAT_R16G16B16A16_UNORM, VkSamplerAddressMode addressingMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER, bool textureInterpolation = false) {
 				if (type == TinyImageType::TYPE_SWAPCHAIN) return VK_ERROR_INITIALIZATION_FAILED;
 
 				VkImageCreateInfo imgCreateInfo = {
@@ -73,6 +73,7 @@
 				VkSamplerMipmapMode mipmapMode = (interpolation)? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
 				float interpolationWeight = (interpolation)? VK_LOD_CLAMP_NONE : 0.0f;
 
+				addressMode = addressingMode;
 				VkSamplerCreateInfo samplerInfo {
 					.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 					.magFilter = filter, .minFilter = filter,
