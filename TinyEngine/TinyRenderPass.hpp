@@ -13,7 +13,7 @@
 
 			TinyRenderObject(TinyPipeline& pipeline, std::pair<VkCommandBuffer, int32_t>& commandBuffer) : executionPipeline(pipeline), executionBuffer(commandBuffer) {}
 
-			void StageBuffer(TinyBuffer& stageBuffer, TinyBuffer& destBuffer, void* sourceData, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
+			void StageBufferToBuffer(TinyBuffer& stageBuffer, TinyBuffer& destBuffer, void* sourceData, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer.description.pMappedData) + destOffset;
 				memcpy(stagedOffset, sourceData, (size_t) byteSize);
 				VkBufferCopy copyRegion { .srcOffset = destOffset, .dstOffset = 0, .size = byteSize };
@@ -21,7 +21,7 @@
 				destOffset += byteSize;
 			}
 
-			void StageImage(TinyBuffer& stageBuffer, TinyImage& destImage, void* sourceData, VkRect2D rect, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
+			void StageBufferToImage(TinyBuffer& stageBuffer, TinyImage& destImage, void* sourceData, VkRect2D rect, VkDeviceSize byteSize, VkDeviceSize& destOffset) {
 				void* stagedOffset = static_cast<int8_t*>(stageBuffer.description.pMappedData) + destOffset;
 				memcpy(stagedOffset, sourceData, (size_t)byteSize);
 				
@@ -94,8 +94,8 @@
 			}
 
 			TinyRenderPass(TinyVkDevice& vkdevice, TinyCommandPool& cmdPool, TinyPipeline& pipeline, TinyImage* targetImage, std::string title, VkDeviceSize subpassIndex, VkDeviceSize localSubpassIndex, uint32_t maxTimestamps = 16U)
-			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), title(title), subpassIndex(subpassIndex), localSubpassIndex(localSubpassIndex), timelineWait(0), timestampIterator(0), maxTimestamps(2U * maxTimestamps * TINY_ENGINE_VALIDATION) {
-				if (pipeline.createInfo.type == TinyPipelineType::TYPE_GRAPHICS) {
+			: vkdevice(vkdevice), cmdPool(cmdPool), pipeline(pipeline), targetImage(targetImage), title(title), subpassIndex(subpassIndex), localSubpassIndex(localSubpassIndex), timelineWait(0), timestampIterator(0), maxTimestamps(2U * maxTimestamps * TINY_ENGINE_VALIDATION) {
+				if (pipeline.createInfo.type == TinyPipelineType::TYPE_GRAPHICS && targetImage == VK_NULL_HANDLE) {
 					#if TINY_ENGINE_VALIDATION
 						std::cout << "TinyEngine: Created [" << title << "] non-transfer/swapchain renderpass with NULLPOINTER image (image not provided)." << std::endl;
 					#endif
@@ -110,17 +110,21 @@
 				#endif
 			}
 
-			VkResult AddDependency(TinyRenderPass& dependency) {
-				if (subpassIndex <= dependency.subpassIndex) {
+			void SetTargetImage(TinyImage* targetImage) {
+				this->targetImage = targetImage;
+			}
+			
+			VkResult AddDependency(TinyRenderPass* dependency) {
+				if (subpassIndex <= dependency->subpassIndex) {
 					#if TINY_ENGINE_VALIDATION
-						std::cout << "TinyEngine: Tried to create cyclical renderpass dependency: " << subpassIndex << " ID depends " << dependency.subpassIndex << " ID" << std::endl;
+						std::cout << "TinyEngine: Tried to create cyclical renderpass dependency: " << subpassIndex << " ID depends " << dependency->subpassIndex << " ID" << std::endl;
 						std::cout << "\t\tRender passes cannot have dependency passes initialized before them (self/equal or lower IDs)." << std::endl;
 					#endif
 					return VK_ERROR_NOT_PERMITTED_KHR;
 				}
 				
-				dependencies.push_back(&dependency);
-				timelineWait = std::max(timelineWait, dependency.subpassIndex);
+				dependencies.push_back(dependency);
+				timelineWait = std::max(timelineWait, dependency->subpassIndex);
 				return VK_SUCCESS;
 			}
 
