@@ -21,7 +21,8 @@
             glm::vec3 position;
             glm::vec4 color;
 
-            TinyVertex(glm::vec2 tex, glm::vec3 pos, glm::vec4 col) : texcoord(tex), position(pos), color(col) {}
+            TinyVertex() : texcoord(glm::vec2(0.0)), position(glm::vec3(0.0)), color(glm::vec4(1.0)) {};
+			TinyVertex(glm::vec2 tex, glm::vec3 pos, glm::vec4 col) : texcoord(tex), position(pos), color(col) {}
 
             static TinyVertexDescription GetVertexDescription() {
                 return TinyVertexDescription(GetBindingDescription(), GetAttributeDescriptions());

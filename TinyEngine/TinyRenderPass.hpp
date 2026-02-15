@@ -166,22 +166,6 @@
 				vkCmdSetViewport(bufferIndexPair.first, 0, 1, &dynamicViewportKHR);
 				
 				VkRect2D renderAreaKHR = { .offset = { .x = 0, .y = 0 } , .extent = { .width = static_cast<uint32_t>(targetImage->width), .height = static_cast<uint32_t>(targetImage->height) } };
-				/*
-				// bool useDefaultRenderArea, VkRect2D renderArea = {}, VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f }
-				if (!useDefaultRenderArea) {
-					int32_t x2 = static_cast<int32_t>(targetImage->width);
-					int32_t y2 = static_cast<int32_t>(targetImage->height);
-
-					renderAreaKHR.offset = {
-						.x = std::max(0, std::min(x2, renderArea.offset.x)),
-						.y = std::max(0, std::min(y2, renderArea.offset.y)),
-					};
-					renderAreaKHR.extent = {
-						.width = static_cast<uint32_t>(std::max(0, std::min(x2, static_cast<int32_t>(renderArea.extent.width) - renderArea.offset.x))),
-						.height = static_cast<uint32_t>(std::max(0, std::min(y2, static_cast<int32_t>(renderArea.extent.height) - renderArea.offset.y)))
-					};
-				}
-				*/
 				vkCmdSetScissor(bufferIndexPair.first, 0, 1, &renderAreaKHR);
 
 				VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };

@@ -69,78 +69,70 @@
 			static size_t GetSizeofArray(std::array<T,S> array) { return S * sizeof(T); }
         };
 
-        /// @brief Creates non-indexed quads in the format of std::vector of TinyVertex.
         class TinyQuad {
         public:
-            static const std::vector<glm::vec4> defvcolors;
+            std::array<TinyVertex, 6> vertices;
+            glm::vec2 origin, position, extent;
+            glm::float32 depth, rotation;
+            glm::vec4 uv;
+
+            TinyQuad(glm::vec2 extent, glm::float32 depth, glm::vec2 xy, glm::vec2 origin, glm::vec2 position, glm::float32 rotation, glm::vec4 uv)
+            : origin(origin), position(position), extent(extent), depth(depth), rotation(rotation), uv(uv) { Vertices(); }
             
-            static std::vector<TinyVertex> CreateFromAtlas(glm::vec4 xywh, glm::float32 depth, glm::vec4 atlas_xywh, glm::vec2 atlas_wh, const std::vector<glm::vec4> vcolors = defvcolors) {
-                glm::vec2 uv1 = { atlas_xywh.x / atlas_wh.x, atlas_xywh.y / atlas_wh.y };
-                glm::vec2 uv2 = uv1 + glm::vec2(atlas_xywh.z / atlas_wh.x, atlas_xywh.w / atlas_wh.y);
-                glm::vec2 xy1 = glm::vec2(xywh.x, xywh.y);
-                glm::vec2 xy2 = glm::vec2(xywh.x, xywh.y) + glm::vec2(xywh.z, xywh.w);
+            TinyQuad& Scale(glm::vec2 scalar) { extent *= scalar; return (*this); }
+            TinyQuad& Resize(glm::vec2 wh) { extent = wh; return (*this); }
+            TinyQuad& Rotate(glm::float32 radians, bool relative) { rotation = glm::mod(((relative)? (rotation + radians) : radians) + glm::two_pi<glm::float32>(), glm::two_pi<glm::float32>()); return (*this); }
+            TinyQuad& Translate(glm::vec2 xy) { position += xy; return (*this); }
+            TinyQuad& Position(glm::vec2 xy) { position = xy; return (*this); }
+            TinyQuad& Origin(glm::vec2 xy) { origin = xy; return (*this); }
+            TinyQuad& Depth(glm::float32 d) { depth = d; return (*this); }
+            TinyQuad& TextCoords(glm::vec2 uv_xy1, glm::vec2 uv_xy2) { uv = glm::vec4(uv_xy1, uv_xy2); return (*this); }
+            TinyQuad& VertexColor(size_t index, glm::vec4 vcolor) { vertices[index].color = vcolor; return (*this); }
+            TinyQuad& VerticesColor(glm::vec4 vcolor) { for(size_t i = 0; i < 6; i++) vertices[i].color = vcolor; return (*this); }
+            size_t SizeofQuad() { return sizeof(TinyVertex) * 6ULL; }
 
-                return {
-                    TinyVertex({uv1.x, uv1.y}, {xy1.x, xy1.y, depth}, vcolors[0]),
-                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vcolors[1]),
-                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[2]),
+            const static std::vector<TinyVertex> GetVertexVector(std::vector<std::array<TinyVertex, 6>> quads) {
+                std::vector<TinyVertex> vertices;
+                for(std::array<TinyVertex, 6> quad : quads)
+                    vertices.insert(vertices.end(), quad.begin(), quad.end());
+                return vertices;
+            }
+            
+            glm::vec4 GetAtlasUVs(glm::vec2 xy, glm::vec2 wh, glm::vec2 atlas) {
+                glm::vec2 uv1, uv2;
+                uv1 = xy / atlas;
+                uv2 = uv1 + (wh / atlas);
+                return glm::vec4(uv1, uv2);
+            }
 
-                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vcolors[0]),
-                    TinyVertex({uv2.x, uv2.y}, {xy2.x, xy2.y, depth}, vcolors[1]),
-                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vcolors[2]),
+            std::array<TinyVertex, 6>& Vertices() {
+                glm::mat2 rotmatrix = glm::mat2(glm::cos(rotation), -glm::sin(rotation), glm::sin(rotation), glm::cos(rotation));
+                glm::vec2 pivot = position + origin;
+                glm::vec2 xy1 = position + origin;
+                glm::vec2 xy2 = xy1 + extent;
+                glm::vec2 uv1 = glm::vec2(uv.x, uv.y);
+                glm::vec2 uv2 = glm::vec2(uv.z, uv.w);
+
+                vertices = {
+                    TinyVertex({uv1.x, uv1.y}, {xy1.x, xy1.y, depth}, vertices[0].color),
+                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vertices[1].color),
+                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vertices[2].color),
+
+                    TinyVertex({uv2.x, uv1.y}, {xy2.x, xy1.y, depth}, vertices[3].color),
+                    TinyVertex({uv2.x, uv2.y}, {xy2.x, xy2.y, depth}, vertices[4].color),
+                    TinyVertex({uv1.x, uv2.y}, {xy1.x, xy2.y, depth}, vertices[5].color),
                 };
-            }
 
-            static std::vector<TinyVertex> Create(glm::vec4 xywh, glm::float32 depth, const std::vector<glm::vec4> vcolors = defvcolors) {
-                return CreateFromAtlas(xywh, depth, glm::vec4(0.0, 0.0, 1.0, 1.0), glm::vec2(1.0, 1.0), vcolors);
-            }
-            
-            static glm::vec2 GetQuadAtlasXYWH(std::vector<TinyVertex>& quad) {
-                glm::vec2 wh = quad[4].texcoord - quad[0].texcoord;
-                return glm::vec4(quad[0].texcoord.x, quad[0].texcoord.y, wh.x, wh.y);
-            }
-
-            static glm::vec4 GetQuadXYWH(std::vector<TinyVertex>& quad) {
-                glm::vec2 wh = quad[4].position - quad[0].position;
-                return glm::vec4(quad[0].position.x, quad[0].position.y, wh.x, wh.y);
-            }
-            
-            static void RotateScaleFromOrigin(std::vector<TinyVertex>& quad, glm::vec3 origin, glm::float32 radians, glm::float32 scale) {
-                glm::mat2 rotation = glm::mat2(glm::cos(radians), -glm::sin(radians), glm::sin(radians), glm::cos(radians));
-                glm::vec2 pivot = origin;
-                glm::vec2 position;
-
-                for (size_t i = 0; i < quad.size(); i++) {
-                    position = quad[i].position;
-
-                    position -= pivot * scale;
-                    position = rotation * scale * position;
-                    position += pivot * scale;
-
-                    quad[i].position = glm::vec3(position, quad[i].position.z);
-                }
-            }
-
-            static void Reposition(std::vector<TinyVertex>& quad, glm::vec2 xy, bool relative) {
-                if (!relative) {
-                    quad[0].position -= quad[0].position;
-                    quad[1].position -= quad[0].position;
-                    quad[2].position -= quad[0].position;
-                    quad[3].position -= quad[0].position;
-                    quad[4].position -= quad[0].position;
-                    quad[5].position -= quad[0].position;
+                for(size_t i = 0; i < 6; i++) {
+                    glm::vec2 xypos = glm::vec2(vertices[i].position);
+                    xypos -= pivot;
+                    xypos = rotmatrix * xypos;
+                    xypos += pivot;
+                    vertices[i].position = glm::vec3(xypos, depth);
                 }
 
-                quad[0].position += glm::vec3(xy,0.0f);
-                quad[1].position += glm::vec3(xy,0.0f);
-                quad[2].position += glm::vec3(xy,0.0f);
-                quad[3].position += glm::vec3(xy,0.0f);
-                quad[4].position += glm::vec3(xy,0.0f);
-                quad[5].position += glm::vec3(xy,0.0f);
+                return vertices;
             }
         };
-
-        /// @brief Default (white) color layout for generating quads.
-        const std::vector<glm::vec4> TinyQuad::defvcolors = { {1.0,1.0,1.0,1.0}, {1.0,1.0,1.0,1.0}, {1.0,1.0,1.0,1.0} };
     }
 #endif
